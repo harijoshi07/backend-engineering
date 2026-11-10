@@ -1,0 +1,64 @@
+---
+// Step-through ASCII animation. Each step: a title, an ASCII frame, and a note.
+interface Step { title: string; art: string; note?: string }
+interface Props { steps: Step[]; caption?: string }
+const { steps, caption } = Astro.props;
+---
+<be-stepper class="not-content">
+  {caption && <p class="caption">{caption}</p>}
+  {steps.map((s, i) => (
+    <div class="step" data-i={i} hidden={i !== 0}>
+      <p class="title"><span class="count">{i + 1}/{steps.length}</span> {s.title}</p>
+      <pre class="art">{s.art}</pre>
+      {s.note && <p class="note">{s.note}</p>}
+    </div>
+  ))}
+  <div class="nav">
+    <button type="button" data-prev>← Prev</button>
+    <div class="dots">{steps.map((_, i) => <span data-dot={i} />)}</div>
+    <button type="button" data-next>Next →</button>
+  </div>
+</be-stepper>
+
+<script>
+  class Stepper extends HTMLElement {
+    i = 0;
+    connectedCallback() {
+      const steps = [...this.querySelectorAll<HTMLElement>('.step')];
+      const dots = [...this.querySelectorAll<HTMLElement>('[data-dot]')];
+      const prev = this.querySelector<HTMLButtonElement>('[data-prev]')!;
+      const next = this.querySelector<HTMLButtonElement>('[data-next]')!;
+      const show = (i: number) => {
+        this.i = Math.max(0, Math.min(steps.length - 1, i));
+        steps.forEach((s, k) => (s.hidden = k !== this.i));
+        dots.forEach((d, k) => d.classList.toggle('on', k <= this.i));
+        prev.disabled = this.i === 0; next.disabled = this.i === steps.length - 1;
+      };
+      prev.addEventListener('click', () => show(this.i - 1));
+      next.addEventListener('click', () => show(this.i + 1));
+      this.tabIndex = 0;
+      this.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight') show(this.i + 1);
+        if (e.key === 'ArrowLeft') show(this.i - 1);
+      });
+      show(0);
+    }
+  }
+  customElements.define('be-stepper', Stepper);
+</script>
+
+<style>
+  be-stepper { display: block; border: 1px solid var(--sl-color-gray-5); border-radius: 10px; padding: 1rem; margin: 1.5rem 0; }
+  be-stepper:focus-visible { outline: 2px solid var(--sl-color-accent); }
+  .caption { margin: 0 0 .5rem; color: var(--sl-color-gray-3); font-size: .85rem; }
+  .title { font-weight: 600; margin: 0 0 .5rem; }
+  .count { font-size: .75rem; color: var(--sl-color-gray-3); font-variant-numeric: tabular-nums; margin-right: .3rem; }
+  .art { font-family: var(--sl-font-mono); font-size: .8rem; line-height: 1.35; overflow-x: auto; padding: .8rem; border-radius: 8px; background: var(--sl-color-bg-inline-code); margin: 0; }
+  .note { margin: .6rem 0 0; }
+  .nav { display: flex; align-items: center; justify-content: space-between; margin-top: .8rem; gap: .5rem; }
+  .nav button { font: inherit; padding: .35rem .8rem; border-radius: 8px; border: 1px solid var(--sl-color-gray-5); background: var(--sl-color-bg-nav); color: var(--sl-color-text); cursor: pointer; }
+  .nav button:disabled { opacity: .4; cursor: default; }
+  .dots { display: flex; gap: .3rem; flex-wrap: wrap; justify-content: center; }
+  .dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--sl-color-gray-5); }
+  .dots span.on { background: var(--sl-color-accent); }
+</style>

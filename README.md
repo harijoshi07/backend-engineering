@@ -1,5 +1,14 @@
 <img src="assets/icon.svg" width="64" height="64" alt="">
 
-# backend-engineering
+# Backend from First Principles
 
-Created in [T3 Code](https://t3.codes).
+A 100-session, Socratic backend engineering course in **Kotlin + Spring Boot**, built around an eSewa/Khalti-style digital wallet.
+
+📖 **Course site:** https://harijoshi07.github.io/backend-engineering/
+
+| Folder | What |
+|---|---|
+| `site/` | Course website (Astro Starlight): roadmap, session notes, progress tracker |
+| `progress/` | Mentor's session log and the spaced-repetition weak-spots queue |
+| `labs/` | First-principles labs: TCP echo, NanoHTTP, KV store, raw ledger, mini DI |
+| `adr/`, `blog/` | Architecture decisions and blog drafts |

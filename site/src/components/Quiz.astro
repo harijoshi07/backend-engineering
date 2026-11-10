@@ -1,0 +1,41 @@
+---
+// Multiple-choice check. The explanation goes in the default slot.
+interface Props { question: string; options: string[]; answer: number }
+const { question, options, answer } = Astro.props;
+---
+<be-quiz data-answer={answer} class="not-content">
+  <p class="q">🧩 {question}</p>
+  <div class="opts">
+    {options.map((o, i) => <button type="button" data-i={i}>{String.fromCharCode(65 + i)}. {o}</button>)}
+  </div>
+  <div class="explain" hidden><slot /></div>
+</be-quiz>
+
+<script>
+  class Quiz extends HTMLElement {
+    connectedCallback() {
+      const ans = Number(this.dataset.answer);
+      const btns = [...this.querySelectorAll<HTMLButtonElement>('button')];
+      btns.forEach((b) => b.addEventListener('click', () => {
+        const i = Number(b.dataset.i);
+        b.classList.add(i === ans ? 'right' : 'wrong');
+        if (i === ans) {
+          btns.forEach((x) => (x.disabled = true));
+          (this.querySelector('.explain') as HTMLElement).hidden = false;
+        }
+      }));
+    }
+  }
+  customElements.define('be-quiz', Quiz);
+</script>
+
+<style>
+  be-quiz { display: block; border: 1px solid var(--sl-color-gray-5); border-radius: 10px; padding: 1rem 1.1rem; margin: 1.5rem 0; }
+  .q { font-weight: 600; margin: 0 0 .7rem; }
+  .opts { display: grid; gap: .4rem; }
+  button { text-align: left; font: inherit; padding: .5rem .75rem; border-radius: 8px; border: 1px solid var(--sl-color-gray-5); background: var(--sl-color-bg-nav); color: var(--sl-color-text); cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--sl-color-accent); }
+  button.right { border-color: var(--sl-color-green); background: color-mix(in srgb, var(--sl-color-green) 15%, transparent); }
+  button.wrong { border-color: var(--sl-color-red); background: color-mix(in srgb, var(--sl-color-red) 12%, transparent); text-decoration: line-through; }
+  .explain { margin-top: .8rem; padding-top: .8rem; border-top: 1px dashed var(--sl-color-gray-5); }
+</style>

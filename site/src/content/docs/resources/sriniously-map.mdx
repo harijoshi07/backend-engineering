@@ -1,0 +1,25 @@
+---
+title: Sriniously notes map
+description: Which sessions cover each chapter of the "Backend from First Principles" notes.
+---
+
+import { chapters } from '../../../data/chapters';
+import { allSessions, NOTES_BASE } from '../../../data/sessions';
+
+The companion notes for Sriniously's YouTube series live at [backend-from-first-principle.vercel.app](https://backend-from-first-principle.vercel.app/). Read each chapter **after** the matching session as a second explanation. Its Go/Python/Java code is useful to compare against our Kotlin.
+
+<table>
+  <thead><tr><th>Ch</th><th>Chapter</th><th>Our sessions</th></tr></thead>
+  <tbody>
+    {Object.entries(chapters).map(([n, c]) => {
+      const hits = allSessions.filter((s) => s.ch?.includes(Number(n))).map((s) => s.n);
+      return (
+        <tr>
+          <td>{n.padStart(2, '0')}</td>
+          <td><a href={`${NOTES_BASE}/${c.slug}/`} target="_blank" rel="noopener">{c.title}</a></td>
+          <td>{hits.length ? hits.map((h) => `S${h}`).join(', ') : 'Elective'}</td>
+        </tr>
+      );
+    })}
+  </tbody>
+</table>

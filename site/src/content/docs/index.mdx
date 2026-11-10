@@ -1,0 +1,52 @@
+---
+title: Backend from First Principles
+description: A 100-session, Socratic backend engineering course in Kotlin + Spring Boot, built around a fintech wallet.
+template: splash
+hero:
+  tagline: 100 sessions. Earn every abstraction. Build a digital wallet that never loses a rupee, then run it in production.
+  actions:
+    - text: How this course works
+      link: start/overview/
+      icon: right-arrow
+    - text: See the roadmap
+      link: roadmap/
+      icon: list-format
+      variant: minimal
+    - text: My progress
+      link: progress/
+      icon: approve-check
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+```text
+  you, today                                                 you, session 100
+  ┌─────────────────┐                                        ┌──────────────────┐
+  │ Android dev     │      sockets → HTTP → SQL → ACID       │ backend engineer │
+  │ (Retrofit calls │ ─▶    Spring → security → Redis     ─▶ │ (you ARE the     │
+  │ the server)     │     Kafka → Docker → observability     │ server Retrofit  │
+  │                 │         → distributed systems          │ talks to)        │
+  └─────────────────┘                                        └──────────────────┘
+```
+
+<CardGrid stagger>
+  <Card title="First principles" icon="puzzle">
+    You build a crude version before using the real tool: an HTTP server from raw sockets, a DI container, a job queue, a JWT signed by hand. After that, Spring stops looking like magic.
+  </Card>
+  <Card title="A real fintech system" icon="star">
+    The flagship is an eSewa/Khalti-style digital wallet with a double-entry ledger, idempotent transfers, KYC limits, flaky bank partners, and reconciliation.
+  </Card>
+  <Card title="Socratic and spaced" icon="comment">
+    Every session opens with recall, every 7th session is review, and you answer a question before any concept is explained.
+  </Card>
+  <Card title="Ends in production" icon="rocket">
+    Docker, CI/CD, a Linux VPS, Prometheus/Grafana/OpenTelemetry, an incident drill, and a mock interview.
+  </Card>
+</CardGrid>
+
+## Where to go
+
+<LinkCard title="Session 0 · Prologue: The Retry Problem" description="The question that started it all: what happens to the money when the response is lost?" href="sessions/s000-prologue/" />
+<LinkCard title="Everything we will touch" description="The full topic and tool inventory." href="start/topics/" />
+<LinkCard title="Sriniously notes map" description="Which session covers each chapter of the companion notes." href="resources/sriniously-map/" />

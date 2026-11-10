@@ -1,0 +1,43 @@
+---
+import { phases, inline, NOTES_BASE } from '../data/sessions';
+import { chapters } from '../data/chapters';
+interface Props { phase: number }
+const p = phases.find((x) => x.id === Astro.props.phase)!;
+const chLink = (c: number) => `${NOTES_BASE}/${chapters[c].slug}/`;
+---
+<section class="phase">
+    <p class="goal"><span class="range">Sessions {p.sessions[0].n}–{p.sessions.at(-1)!.n}</span> · {p.goal}</p>
+    <table>
+      <thead><tr><th>#</th><th>Session</th><th>Key work</th><th>Notes</th></tr></thead>
+      <tbody>
+        {p.sessions.map((s) => (
+          <tr class:list={[{ review: s.review, milestone: s.milestone }]}>
+            <td class="num">{s.n}</td>
+            <td class="title">{s.title}</td>
+            <td set:html={inline(s.work)} />
+            <td class="ch">
+              {(s.ch ?? []).map((c) => (
+                <a href={chLink(c)} title={chapters[c].title} target="_blank" rel="noopener">📗{String(c).padStart(2, '0')}</a>
+              ))}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    {p.gate && <p class="gate"><strong>🚧 Gate:</strong> <span set:html={inline(p.gate)} /></p>}
+</section>
+
+<style>
+  .phase { margin-top: 0.5rem; }
+  .range { font-style: normal; font-weight: 600; color: var(--sl-color-accent); }
+  .goal { color: var(--sl-color-gray-2); font-style: italic; }
+  table { display: table; width: 100%; font-size: 0.9rem; }
+  td.num { font-variant-numeric: tabular-nums; color: var(--sl-color-gray-3); width: 2.5rem; }
+  td.title { font-weight: 600; white-space: nowrap; }
+  td.ch { white-space: nowrap; }
+  td.ch a { text-decoration: none; margin-right: 0.3rem; }
+  tr.review td { background: color-mix(in srgb, var(--sl-color-accent) 8%, transparent); }
+  tr.milestone td { background: color-mix(in srgb, var(--sl-color-green) 10%, transparent); }
+  .gate { border-left: 4px solid var(--sl-color-orange); padding: 0.5rem 0.9rem; background: color-mix(in srgb, var(--sl-color-orange) 8%, transparent); border-radius: 0 6px 6px 0; }
+  @media (max-width: 50rem) { td.title { white-space: normal; } }
+</style>

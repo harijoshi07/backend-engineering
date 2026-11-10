@@ -1,0 +1,174 @@
+/* ─────────────────────────────────────────────────────────────
+   Theme: "warm paper" (light) · "espresso" (dark)
+   Starlight convention: in light mode --sl-color-white is the
+   DARKEST ink and --sl-color-black is the page background.
+   ───────────────────────────────────────────────────────────── */
+
+:root {
+  --sl-font: 'Inter Variable', var(--sl-font-system);
+  --sl-font-mono: 'JetBrains Mono Variable', var(--sl-font-system-mono);
+  --be-font-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
+
+  /* Dark: espresso & amber */
+  --sl-color-white: hsl(35, 40%, 96%);
+  --sl-color-gray-1: hsl(33, 26%, 90%);
+  --sl-color-gray-2: hsl(30, 14%, 79%);
+  --sl-color-gray-3: hsl(28, 9%, 60%);
+  --sl-color-gray-4: hsl(26, 7%, 42%);
+  --sl-color-gray-5: hsl(24, 10%, 25%);
+  --sl-color-gray-6: hsl(22, 13%, 14%);
+  --sl-color-black: hsl(20, 14%, 9%);
+
+  --sl-color-accent-low: hsl(20, 45%, 19%);
+  --sl-color-accent: hsl(24, 86%, 62%);
+  --sl-color-accent-high: hsl(32, 92%, 82%);
+
+  /* Asides: note = muted teal, tip = sage (instead of cold blue / purple) */
+  --sl-color-blue-low: hsl(195, 30%, 17%);
+  --sl-color-blue: hsl(190, 55%, 58%);
+  --sl-color-blue-high: hsl(188, 60%, 84%);
+  --sl-color-purple-low: hsl(100, 20%, 17%);
+  --sl-color-purple: hsl(95, 40%, 60%);
+  --sl-color-purple-high: hsl(90, 50%, 82%);
+
+  --be-code-bg: hsl(22, 14%, 12%);
+
+  --be-glow: hsla(24, 90%, 55%, 0.16);
+  --be-surface: hsl(22, 14%, 12%);
+  --be-ink-soft: hsl(30, 14%, 70%);
+}
+
+:root[data-theme='light'] {
+  /* Light: warm paper & terracotta */
+  --sl-color-white: hsl(24, 28%, 12%);
+  --sl-color-gray-1: hsl(24, 20%, 18%);
+  --sl-color-gray-2: hsl(24, 14%, 26%);
+  --sl-color-gray-3: hsl(26, 10%, 40%);
+  --sl-color-gray-4: hsl(28, 10%, 57%);
+  --sl-color-gray-5: hsl(32, 22%, 82%);
+  --sl-color-gray-6: hsl(36, 40%, 92.5%);
+  --sl-color-gray-7: hsl(38, 48%, 95.5%);
+  --sl-color-black: hsl(40, 55%, 97.6%);
+
+  --sl-color-accent-low: hsl(20, 75%, 91%);
+  --sl-color-accent: hsl(16, 64%, 45%);
+  --sl-color-accent-high: hsl(14, 62%, 27%);
+
+  --sl-color-blue-low: hsl(190, 40%, 91%);
+  --sl-color-blue: hsl(192, 55%, 36%);
+  --sl-color-blue-high: hsl(195, 60%, 22%);
+  --sl-color-purple-low: hsl(95, 32%, 90%);
+  --sl-color-purple: hsl(100, 32%, 38%);
+  --sl-color-purple-high: hsl(100, 40%, 20%);
+
+  --be-code-bg: hsl(36, 45%, 94%);
+
+  --sl-color-bg-nav: hsl(38, 50%, 95%);
+  --sl-color-bg-sidebar: hsl(38, 50%, 95%);
+  --sl-color-bg-inline-code: hsl(34, 42%, 90%);
+
+  --be-glow: hsla(18, 80%, 60%, 0.14);
+  --be-surface: hsl(38, 60%, 99%);
+  --be-ink-soft: hsl(26, 10%, 40%);
+}
+
+/* ── Typography ─────────────────────────────────────────────── */
+.sl-markdown-content :is(h1, h2, h3, h4),
+h1#_top,
+.hero h1,
+.site-title {
+  font-family: var(--be-font-display);
+  font-optical-sizing: auto;
+  letter-spacing: -0.01em;
+}
+h1#_top { font-weight: 650; }
+.sl-markdown-content h2 { font-weight: 600; }
+.sl-markdown-content h3 { font-weight: 560; }
+.site-title { font-weight: 650; font-size: 1.15rem; color: var(--sl-color-white); }
+
+.sl-markdown-content h2 {
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--sl-color-hairline-light);
+}
+
+.sl-markdown-content a:not(.not-content a) {
+  text-decoration-color: color-mix(in srgb, var(--sl-color-accent) 45%, transparent);
+  text-underline-offset: 0.2em;
+}
+.sl-markdown-content a:not(.not-content a):hover { text-decoration-color: var(--sl-color-accent); }
+
+::selection { background: color-mix(in srgb, var(--sl-color-accent) 30%, transparent); }
+
+/* ── Splash / hero ──────────────────────────────────────────── */
+[data-has-hero] .main-frame {
+  background:
+    radial-gradient(60rem 30rem at 85% -5%, var(--be-glow), transparent 60%),
+    radial-gradient(40rem 24rem at -10% 10%, var(--be-glow), transparent 60%);
+}
+.hero h1 {
+  font-weight: 700;
+  font-size: clamp(2.4rem, 6vw, 4rem);
+  line-height: 1.05;
+  background: linear-gradient(120deg, var(--sl-color-white) 30%, var(--sl-color-accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hero .tagline { color: var(--be-ink-soft); font-size: 1.15rem; }
+
+/* ── Tables ─────────────────────────────────────────────────── */
+.sl-markdown-content table {
+  font-size: 0.92rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.sl-markdown-content :is(th, td) { border: 0; border-bottom: 1px solid var(--sl-color-hairline-light); }
+.sl-markdown-content tr:last-child td { border-bottom: 0; }
+.sl-markdown-content th {
+  background: var(--sl-color-gray-6);
+  color: var(--sl-color-white);
+  font-weight: 600;
+}
+
+/* ── Cards, asides, code ────────────────────────────────────── */
+.card {
+  background: var(--be-surface);
+  border-radius: 12px;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.card:hover { transform: translateY(-2px); border-color: var(--sl-color-accent); }
+.sl-link-card { background: var(--be-surface); border-radius: 12px; }
+.starlight-aside { border-radius: 0 10px 10px 0; }
+.sl-markdown-content blockquote {
+  border-left: 3px solid var(--sl-color-accent);
+  background: color-mix(in srgb, var(--sl-color-accent) 6%, transparent);
+  padding: 0.6rem 1rem;
+  border-radius: 0 10px 10px 0;
+  color: var(--sl-color-gray-2);
+}
+.sl-markdown-content code:not(pre code) { border-radius: 5px; padding: 0.1em 0.35em; }
+
+/* ── Sidebar ────────────────────────────────────────────────── */
+.sidebar-content a[aria-current='page'] {
+  background: color-mix(in srgb, var(--sl-color-accent) 16%, transparent);
+  color: var(--sl-color-white);
+  border-inline-start: 3px solid var(--sl-color-accent);
+  font-weight: 600;
+}
+
+/* ── Mermaid ────────────────────────────────────────────────── */
+pre.mermaid {
+  background: var(--be-surface);
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 12px;
+  padding: 1rem;
+  text-align: center;
+  overflow-x: auto;
+}
+pre.mermaid:not([data-processed]) { color: transparent; min-height: 4rem; }
+
+.sl-markdown-content :is(th, td):first-child { padding-inline-start: 0.9rem; }
+.sl-markdown-content :is(th, td):last-child { padding-inline-end: 0.9rem; }

@@ -1,0 +1,38 @@
+---
+// Socratic "think first" box: you must write an answer before you can reveal.
+// Your answer is saved in this browser (localStorage) so you can compare later.
+interface Props { id: string; prompt: string; revealLabel?: string }
+const { id, prompt, revealLabel = 'Reveal' } = Astro.props;
+---
+<be-think data-id={id} class="not-content">
+  <p class="prompt">🤔 {prompt}</p>
+  <textarea rows="3" placeholder="Write your answer first, in your own words…"></textarea>
+  <button type="button" disabled>{revealLabel}</button>
+  <div class="answer" hidden><slot /></div>
+</be-think>
+
+<script>
+  class Think extends HTMLElement {
+    connectedCallback() {
+      const key = `be-think:${location.pathname}:${this.dataset.id}`;
+      const ta = this.querySelector('textarea')!;
+      const btn = this.querySelector('button')!;
+      const ans = this.querySelector('.answer') as HTMLElement;
+      try { ta.value = localStorage.getItem(key) ?? ''; } catch {}
+      const sync = () => { btn.disabled = ta.value.trim().length < 10; };
+      ta.addEventListener('input', () => { try { localStorage.setItem(key, ta.value); } catch {} sync(); });
+      btn.addEventListener('click', () => { ans.hidden = false; btn.hidden = true; });
+      sync();
+    }
+  }
+  customElements.define('be-think', Think);
+</script>
+
+<style>
+  be-think { display: block; border: 1px solid var(--sl-color-accent); border-radius: 10px; padding: 1rem 1.1rem; margin: 1.5rem 0; background: color-mix(in srgb, var(--sl-color-accent) 5%, transparent); }
+  .prompt { font-weight: 600; margin: 0 0 .6rem; }
+  textarea { width: 100%; box-sizing: border-box; font: inherit; padding: .6rem; border-radius: 8px; border: 1px solid var(--sl-color-gray-5); background: var(--sl-color-bg); color: var(--sl-color-text); resize: vertical; }
+  button { margin-top: .5rem; font: inherit; padding: .4rem .9rem; border-radius: 8px; border: 0; background: var(--sl-color-accent); color: var(--sl-color-black); cursor: pointer; font-weight: 600; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .answer { margin-top: .8rem; padding-top: .8rem; border-top: 1px dashed var(--sl-color-gray-5); }
+</style>
