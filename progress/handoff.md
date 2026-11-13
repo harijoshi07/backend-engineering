@@ -22,9 +22,10 @@ This repo is a self-taught backend course: a public GitHub Pages site plus a tea
   - **Lesson 4**: Protocols, and the HTTP request (H1, H2)
   - **Lesson 5**: The response, and where a message ends (H3, H4)
   - **Lesson 6**: Methods, status codes, JSON (H5, H6, H7). HTTP layer complete.
-- **Graded (2026-11-13):** L1–L5 (records 0002–0005). L5 teach-back showed two misconceptions, re-asked as L6 recall: they think the connection closes after a Content-Length body (it stays open; close is the *no-length* method), and they called the server's incoming message a "response".
-- **Waiting on the learner:** all Lesson 6 Think boxes (in the gist).
-- **Next to write:** Lesson 7, a server is a loop + a Kotlin server by hand with `ServerSocket` (S1, S2). The learner writes this code; the lesson guides, it doesn't hand over a finished server. Grade L6 first.
+  - **Lesson 7**: A server is a loop (S1, S2). The learner writes `handmade/Server.kt` in their new private `maths` repo from a skeleton; reference solution is behind a reveal.
+- **Graded (2026-11-13):** L1–L6 (records 0002–0006). Persistent misconceptions (wrong twice): a response without length "hangs forever" (it ends at close), and "the server won't know" a no-length request's body size (it's zero). L7 re-asks both and makes them concrete (readAllBytes deadlock demo).
+- **Waiting on the learner:** L7 Think boxes, especially `maths-l7-code` (review it like a PR) and `maths-l7-weakness` (one request at a time → sets up threads).
+- **Next to write:** Lesson 8, threads (S3). Grade L7 first.
 
 ## Where the learner's answers are
 Every question in a lesson is a `Think` box. Answers sync to the learner's **secret gist "backend-engineering answers"** (`<think-id>.md`), from the site on any device once they've pasted a gist-scoped token, and from chat (Claude writes them there). Fetch from the gist before grading: `gh gist list | grep 'backend-engineering answers'`.

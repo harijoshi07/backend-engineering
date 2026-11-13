@@ -1,0 +1,275 @@
+---
+title: '7 · A server is a loop'
+description: You write your first server, in about 40 lines of Kotlin, with nothing but a ServerSocket. It listens, accepts, reads a request, decides, and writes a response. Then it does it again.
+sidebar:
+  label: '7 · A server is a loop'
+  order: 7
+---
+
+import Quiz from '../../../components/Quiz.astro';
+import Think from '../../../components/Think.astro';
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+<Aside type="tip" title="Today: 2 bricks · ≈45 min · you write the code">
+**a server is a loop** → **a Kotlin server by hand**. Win: `curl` asks *your* program for a question, sends it an answer, and your program says `correct`. No framework. Every byte is one you chose.
+</Aside>
+
+## Recall (from memory)
+
+<Think id="maths-l7-recall-1" prompt="Your server has read a request's headers. There's no Content-Length (and no Transfer-Encoding). How many body bytes should it read, and why can't it 'read until the connection closes'?" revealLabel="Check">
+**Zero.** A request with neither header has no body ([RFC 9112 §6.3](https://www.rfc-editor.org/rfc/rfc9112#section-6.3), rule 7). It can't read until the close, because the client won't close: it's keeping the connection open to read your response. Both sides would wait for each other forever. In step 3 you'll see that happen.
+</Think>
+
+<Think id="maths-l7-recall-2" prompt="A response has no Content-Length. How does the client know the body is over? Is that 'hanging forever'?" revealLabel="Check">
+It reads until the **server closes the connection**. The close *is* the end. It's not forever: in lesson 5, `curl` printed your body and finished the moment you pressed Ctrl+C in the `nc` window, because Ctrl+C closed the connection.
+</Think>
+
+## Brick 1 · A server is a loop
+
+Everything you've learned, as a program:
+
+```text
+listen on port 8080                                        (lesson 2)
+forever:
+    accept()       wait until a client connects            (lesson 3)
+    read           the request line + headers, up to the empty line,
+                   then exactly Content-Length body bytes  (lessons 4–5)
+    decide         method + target → status + body         (lesson 6)
+    write          status line, headers, empty line, body  (lessons 5–6)
+    close          this connection, and go back to accept()
+```
+
+That's what every HTTP server does, Spring included. Spring adds a lot around it, but this loop is the core.
+
+You know a loop like this already. Android's main thread runs a **`Looper`**: wait for the next message, handle it, wait again, forever ([Android docs: Looper](https://developer.android.com/reference/android/os/Looper)). A server's main loop has the same shape. `accept()` is the "wait", and one request is the "message".
+
+`accept()` **blocks**: the process sleeps and uses no CPU until a client connects (the blocked process from lesson 2). Then it returns the new connection, and the program can read and write on it ([Java docs: `ServerSocket.accept()`](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/net/ServerSocket.html#accept())).
+
+One simplification today: the server **closes the connection after each response**. Real servers keep it open for reuse (lesson 5). Ours still sends `Content-Length`, so `curl` knows where the body ends without waiting for the close.
+
+## Brick 2 · The Kotlin tools
+
+Five things from the JDK, which Kotlin uses directly. The JDK calls a connection's end a `Socket`:
+
+| You want to | Kotlin |
+|---|---|
+| listen on 8080 | `val server = ServerSocket(8080)` |
+| wait for a client, get the connection | `val socket = server.accept()` |
+| read bytes from the client | `val input = socket.getInputStream()`, then `input.readNBytes(n)` reads exactly `n` bytes |
+| write bytes to the client | `socket.getOutputStream().write(bytes)` |
+| end the connection | `socket.close()` |
+
+Text ↔ bytes is lesson 3's `encodeToByteArray()` and its reverse, `decodeToString()`.
+
+Reading **one line** (up to `\n`) from a byte stream is fiddly, so here's that helper, ready-made. Read it once. It does exactly what lesson 4 described:
+
+```kotlin
+// Reads bytes up to \n, and returns them as text without the \r\n.
+fun InputStream.readHttpLine(): String {
+    val bytes = mutableListOf<Byte>()
+    while (true) {
+        val b = read()                              // one byte, or -1 if the client closed
+        if (b == -1 || b == '\n'.code) break
+        bytes += b.toByte()
+    }
+    return bytes.toByteArray().decodeToString().removeSuffix("\r")
+}
+```
+
+## Build it: your first server
+
+**Where:** this is the start of your maths backend, so give it a home. Create your private repo `maths` on GitHub, clone it, and make a folder `handmade/` with a file `Server.kt`. (The Spring version comes in lesson 10, in the same repo.)
+
+**Run it** from `handmade/`. It takes about 10 seconds to compile:
+
+```bash
+kotlinc Server.kt -include-runtime -d server.jar && java -jar server.jar
+```
+
+Stop it with Ctrl+C. If you get `Address already in use`, you know what that means (lesson 2).
+
+Start from this skeleton. **You fill in each TODO, one step at a time**, and check each step before the next.
+
+```kotlin
+import java.io.InputStream
+import java.net.ServerSocket
+
+// (paste readHttpLine from above here)
+
+fun main() {
+    val server = ServerSocket(8080)
+    println("Listening on 8080")
+    while (true) {
+        val socket = server.accept()
+        // TODO step 2: read the request line and the headers
+        // TODO step 3: read the body
+        // TODO step 4: decide, and write the response
+        socket.close()
+    }
+}
+```
+
+<Steps>
+
+1. **Listen and accept.** Run the skeleton as it is. In a second window, run `lsof -nP -iTCP:8080 -sTCP:LISTEN`: there's your `java` process. Then `curl http://localhost:8080/question`. I got `curl: (52) Empty reply from server` the first time and `curl: (56) Recv failure: Connection reset by peer` the second. Both mean the same thing: `curl` connected, your server accepted, then closed without writing a byte. ("Reset" appears because your server closed before reading the request. The OS then tells the client its bytes were thrown away.) Your loop works: every `curl` gets accepted, again and again.
+
+2. **Read the request.** Use `readHttpLine()` to read the request line. Then keep reading lines into a `mutableMapOf<String, String>()` until you get an **empty** line (lesson 4). Split each header line on the first `:` with `line.split(":", limit = 2)`. Store names in **lowercase**, because they're case-insensitive (lesson 6), and `.trim()` the spaces.
+
+   `println` the request line and the map, then run `curl http://localhost:8080/question` again. Your server should print `GET /question HTTP/1.1` and a map with `host`, `user-agent` and `accept`.
+
+3. **Read the body.** Look up `content-length`. If it's missing, the length is **0** (recall question 1). Then `input.readNBytes(length).decodeToString()`.
+
+   <Think id="maths-l7-predict" prompt="Before you write it: suppose you used input.readAllBytes() instead (read until the client closes). What would happen when curl sends GET /question?" />
+
+   Test with a body: `curl -X POST http://localhost:8080/answer -d 56`. Your server should print `56` as the body.
+
+4. **Decide and respond.** Split the request line into method and target. Then:
+   - `GET /question` → `200 OK`, body `7 x 8 = ?` followed by `\n`
+   - `POST /answer` → `200 OK`, body `correct\n` if the trimmed body is `56`, else `wrong\n`
+   - anything else → `404 Not Found`, body `no such thing\n`
+
+   Write the status line, then `Content-Type: text/plain`, then `Content-Length`, then the empty line, then the body. Every line ends in `\r\n`. **`Content-Length` counts bytes**, so compute it from the encoded bytes.
+
+</Steps>
+
+## Check it works
+
+With your server running, in another window:
+
+```bash
+curl http://localhost:8080/question
+curl -X POST http://localhost:8080/answer -d 56
+curl -X POST http://localhost:8080/answer -d 65
+curl -i http://localhost:8080/nope
+```
+
+My version printed exactly:
+
+```text
+7 x 8 = ?
+correct
+wrong
+HTTP/1.1 404 Not Found
+Content-Type: text/plain
+Content-Length: 14
+
+no such thing
+```
+
+And the server's own window, one line per request:
+
+```text
+Listening on 8080
+GET /question HTTP/1.1 | body=
+POST /answer HTTP/1.1 | body=56
+POST /answer HTTP/1.1 | body=65
+GET /nope HTTP/1.1 | body=
+```
+
+Notice the last line of the `curl` output. `65` got `wrong` because **your server** compared it with its own `56`. That's lesson 1's source of truth, and you just wrote it.
+
+## Break it on purpose (I did, here's what happened)
+
+**Bug 1: read until close.** I swapped `readNBytes(length)` for `readAllBytes()`. Then even a plain `GET` hung: `curl` waited 4 seconds and gave up (`exit 28`, timeout). Only then did the server see the connection close. It tried to answer, and crashed:
+
+```text
+Exception in thread "main" java.net.SocketException: Broken pipe
+```
+
+The server was waiting for the client to close, and the client was waiting for the response: a **deadlock**. That's why a request without `Content-Length` must mean "no body".
+
+**Bug 2: count characters.** I changed the body to `7×8 = ?\n` and computed `Content-Length` with `text.length` (8 characters). But `×` is 2 bytes, so the body is 9 bytes:
+
+```text
+00000000: 37c3 9738 203d 203f                      7..8 = ?
+```
+
+The `\n` at the end (`0a`) is missing: `curl` stopped after 8 bytes, exactly as told (lesson 5). With the encoded byte count, the `0a` comes back.
+
+## Check yourself
+
+<Quiz
+  question="What does server.accept() do when no client is connecting?"
+  options={[
+    'It returns null straight away',
+    'It blocks until a client connects',
+    'It throws an exception after a timeout',
+  ]}
+  answer={1}
+>
+It blocks: the process sleeps until a client connects, then returns that connection. Like the `nc -l` you watched in lesson 2.
+</Quiz>
+
+<Quiz
+  question={'Your body is "7×8 = ?\\n". Which value belongs in Content-Length?'}
+  options={[
+    'The number of encoded bytes',
+    'The number of characters in it',
+    'The number of lines in it',
+  ]}
+  answer={0}
+>
+`Content-Length` counts bytes. `×` is one character but two bytes in UTF-8, so `text.length` comes out one short and the client cuts off the last byte.
+</Quiz>
+
+<Quiz
+  question="Why does the server loop back to accept() after closing?"
+  options={[
+    'To retry the request that failed',
+    'To free the memory used by sockets',
+    'To serve the next client that connects',
+  ]}
+  answer={2}
+>
+One pass of the loop serves one connection. Without the loop, your server would answer one `curl` and exit.
+</Quiz>
+
+## Your turn
+
+<Think id="maths-l7-code" prompt="Paste your finished Server.kt here. I'll review it like a pull request." revealLabel="Show my version">
+Compare yours with mine after you've pasted. Different is fine. What matters is that it reads exactly `Content-Length` bytes (0 if absent), and that it writes a byte-accurate `Content-Length`.
+
+```kotlin
+fun main() {
+    val server = ServerSocket(8080)
+    println("Listening on 8080")
+    while (true) {
+        val socket = server.accept()
+        val input = socket.getInputStream()
+        val requestLine = input.readHttpLine()
+        val headers = mutableMapOf<String, String>()
+        while (true) {
+            val line = input.readHttpLine()
+            if (line.isEmpty()) break
+            val (name, value) = line.split(":", limit = 2)
+            headers[name.trim().lowercase()] = value.trim()
+        }
+        val length = headers["content-length"]?.toInt() ?: 0
+        val body = input.readNBytes(length).decodeToString()
+        println("$requestLine | body=$body")
+
+        val (method, target) = requestLine.split(" ")
+        val (status, text) = when {
+            method == "GET" && target == "/question" -> "200 OK" to "7 x 8 = ?\n"
+            method == "POST" && target == "/answer" -> "200 OK" to (if (body.trim() == "56") "correct\n" else "wrong\n")
+            else -> "404 Not Found" to "no such thing\n"
+        }
+        val bytes = text.encodeToByteArray()
+        val out = socket.getOutputStream()
+        out.write("HTTP/1.1 $status\r\nContent-Type: text/plain\r\nContent-Length: ${bytes.size}\r\n\r\n".encodeToByteArray())
+        out.write(bytes)
+        socket.close()
+    }
+}
+```
+</Think>
+
+<Think id="maths-l7-weakness" prompt="Your server has a serious weakness for a duel game. Hint: what happens to Sita's request while your server is busy with yours? Guess, in a sentence or two." />
+
+## Read alongside
+- 📖 **Primary:** [Oracle's Java tutorial: Writing the Server Side of a Socket](https://docs.oracle.com/javase/tutorial/networking/sockets/clientServer.html). The same accept → read → write, in Java (15 min). It reads with a `BufferedReader` of characters. You now know why we read bytes: `Content-Length` counts bytes.
+- [Java docs: `ServerSocket`](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/net/ServerSocket.html) and [`InputStream`](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/io/InputStream.html) (`readNBytes`).
+
+🙋 Stuck on a step? Ask me, and paste your code and the error. Good questions: "why does `split` need `limit = 2`?", "what does `exit 52` mean?", "what if two requests come at once?"
+
+**Next:** Lesson 8: threads, so your server can serve you and Sita at the same time.
