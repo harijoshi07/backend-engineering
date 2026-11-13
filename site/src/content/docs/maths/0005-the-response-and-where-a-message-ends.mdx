@@ -1,0 +1,179 @@
+---
+title: '5 · The response, and where a message ends'
+description: The server's half of HTTP, and the answer to lesson 3's puzzle. A reader knows a body is over because it was told how many bytes to expect.
+sidebar:
+  label: '5 · Response & length'
+  order: 5
+---
+
+import Quiz from '../../../components/Quiz.astro';
+import Think from '../../../components/Think.astro';
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+<Aside type="tip" title="Today: 2 bricks · ≈25 min">
+**HTTP response** → **where a message ends**. Win: you'll *be* the server, typing a response by hand that `curl` accepts, and make `curl` hang, stop early and finish cleanly, on purpose.
+</Aside>
+
+## Recall (from memory)
+
+<Think id="maths-l5-recall-1" prompt="This request line has two mistakes in its bytes: GET /duels/{code} HTTP/1.1 followed by a space, then \r\n. What are they?" revealLabel="Check">
+1. `{code}` is Retrofit's placeholder. The bytes on the wire carry the real value: `/duels/K7QM`.
+2. The space before `\r\n`. A request line is exactly *method · space · target · space · version*, then `\r\n` ([RFC 9112 §3](https://www.rfc-editor.org/rfc/rfc9112#section-3)). An extra space is an extra byte, and a strict server rejects it.
+</Think>
+
+<Think id="maths-l5-recall-2" prompt="A protocol must answer 'where does each message end?'. In lesson 4, HTTP answered that for the headers. How? And what's still unanswered?" revealLabel="Check">
+The headers end at the **empty line** (`\r\n` on its own). But a body can contain anything, including empty lines, so the empty line can't mark where the *body* ends. That's today.
+</Think>
+
+## Brick 1 · The HTTP response
+
+The server's reply has the same shape as a request: a first line, headers, an empty line, an optional body ([MDN: HTTP messages](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Messages)). Only the first line differs. A response the maths server could send:
+
+```text
+ ┌─ status line ───────────────────────────────┐
+ │ HTTP/1.1   200   OK                   \r\n  │   version · status code · reason
+ ├─ headers ───────────────────────────────────┤
+ │ Content-Length: 11                    \r\n  │   the body is 11 bytes
+ ├─ empty line ────────────────────────────────┤
+ │                                       \r\n  │
+ ├─ body ──────────────────────────────────────┤
+ │ 7 x 8 = ?\r\n                               │   9 + 2 = 11 bytes
+ └─────────────────────────────────────────────┘
+```
+
+The **status code** is the server's verdict in one number. `200` means "it worked". The reason phrase (`OK`) is just a human-readable label for it. You've seen one other code already: `400`, when `Host` was missing. Lesson 6 covers the rest.
+
+Retrofit reads this for you. `response.code()` is that `200`, and the body is what Moshi or Gson turns into your data class.
+
+## Brick 2 · Where a message ends
+
+A body can hold any bytes: JSON, HTML, an image. No byte inside it can mean "the end", because that byte might be part of the data. So HTTP solves it the only reliable way: **the sender says in advance how long the body is.** HTTP/1.1 has exactly three ways ([RFC 9112 §6.3](https://www.rfc-editor.org/rfc/rfc9112#section-6.3)):
+
+| How | The header | The reader stops when… |
+|---|---|---|
+| **Fixed length** | `Content-Length: 11` | it has read 11 bytes after the empty line |
+| **Chunked** | `Transfer-Encoding: chunked` | it reads a chunk of size 0 (the body arrives in pieces, each with its size written first) |
+| **Close** | neither | the server closes the connection (responses only) |
+
+So in lesson 4, `curl` added `Content-Length: 13` so the server would know exactly where `{"answer":56}` ends. It wasn't a check that the bytes arrived. It's the *only* way the server knows when to stop reading and start answering. And `example.com` used the second way: its response said `Transfer-Encoding: chunked`.
+
+**Why the third way is a last resort:** if "the end" means "the connection closed", every response costs a whole new connection. Clients keep connections open and reuse them for the next request. OkHttp's connection pool does this, and it's a big reason your app's second API call is faster than its first ([MDN: connection management](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Connection_management_in_HTTP_1.x)). A request can't use it at all: the client still needs the connection to read the reply. So the standard says a request with neither header simply has no body.
+
+**The reader trusts the number.** It doesn't guess. I tested what `curl` does with honest and dishonest lengths. The server sent the 11-byte body `7 x 8 = ?\r\n` each time and kept the connection open for 3 seconds:
+
+| Server says | `curl` printed | Finished |
+|---|---|---|
+| *no length* | `7 x 8 = ?` | after 2.5 s, only when the connection closed |
+| `Content-Length: 11` | `7 x 8 = ?` | **immediately**, connection "left intact" for reuse |
+| `Content-Length: 5` | `7 x 8` | immediately; the other 6 bytes were dropped |
+| `Content-Length: 50` | `7 x 8 = ?` | after 2.5 s, with an error: "transfer closed with 39 bytes remaining to read" |
+
+Too small cuts the body off. Too big makes the client wait for bytes that never come. Spring will compute this number for you. Now you know what breaks when it's wrong.
+
+## Hands-on: be the server
+
+<Steps>
+
+1. **No length.** Window A, a server that sends `\r\n` when you press Enter:
+
+   ```bash
+   nc -c -l 8080
+   ```
+
+   Window B (`-v` shows both sides; `127.0.0.1` skips a confusing IPv6 attempt):
+
+   ```bash
+   curl -v http://127.0.0.1:8080/question
+   ```
+
+   Window A shows `curl`'s request. Now type the response into window A: `HTTP/1.1 200 OK`, Enter, Enter again (the empty line), then `7 x 8 = ?`, Enter.
+
+   `curl` prints your body, but **doesn't finish**. It's waiting for the connection to close, because you never said how long the body was. Press Ctrl+C in window A: now `curl` ends.
+
+2. **With a length.** Same two commands again. This time type:
+
+   ```text
+   HTTP/1.1 200 OK
+   Content-Length: 11
+
+   7 x 8 = ?
+   ```
+
+   `curl` finishes **on its own** the moment the 11th byte arrives. In its `-v` output, the lines starting `<` are your response, and the last line says:
+
+   ```text
+   * Connection #0 to host localhost left intact
+   ```
+
+   The connection is still open, ready for another request.
+
+3. **Lie about it.** Repeat with `Content-Length: 5` and watch the body get cut off. Then try `Content-Length: 50`: `curl` waits for 39 bytes that never come, until you press Ctrl+C.
+
+</Steps>
+
+<Aside type="note" title="The thing to remember">
+A response is a **status line** (version, code, reason), headers, an empty line and a body. The empty line ends the headers. The body ends where **`Content-Length`** says (or at a size-0 chunk, or when the connection closes). The reader trusts that number completely.
+</Aside>
+
+## Check yourself
+
+<Quiz
+  question="A response says Content-Length: 5, and the body is 7 x 8 = ?. What does the client get?"
+  options={[
+    'The whole body, ignoring the length',
+    'Only the first five body bytes',
+    'An error about the mismatched length',
+  ]}
+  answer={1}
+>
+The reader trusts the number: 5 bytes, `7 x 8`. The rest is dropped, or worse, read as the start of the *next* response on that connection.
+</Quiz>
+
+<Quiz
+  question="A response has no Content-Length and isn't chunked. When does the client stop reading?"
+  options={[
+    'After the first empty line',
+    'After one second of silence',
+    'When the connection gets closed',
+  ]}
+  answer={2}
+>
+That's the third rule. It's why `curl` hung in step 1 until you pressed Ctrl+C.
+</Quiz>
+
+<Quiz
+  question="Why do real servers avoid the close-the-connection rule?"
+  options={[
+    'The connection cannot be reused',
+    'Closing is a security risk',
+    'Clients cannot detect closed connections',
+  ]}
+  answer={0}
+>
+Closing to mark the end means a new connection for every request. OkHttp's connection pool exists to avoid exactly that.
+</Quiz>
+
+## Your turn
+
+<Think id="maths-l5-write" prompt="Write the full response the maths server sends when your answer is right, with the body {&quot;correct&quot;:true}. Every line, every \r\n, and the correct Content-Length." revealLabel="Check against the answer">
+```text
+HTTP/1.1 200 OK\r\n
+Content-Length: 16\r\n
+\r\n
+{"correct":true}
+```
+`{"correct":true}` is 16 bytes: `{` 1 + `"correct"` 9 + `:` 1 + `true` 4 + `}` 1. Check it yourself: `printf '{"correct":true}' | wc -c`. (A real server also says the body is JSON, with `Content-Type`. That's lesson 6.)
+</Think>
+
+<Think id="maths-l5-teachback" prompt="Back to lesson 3's puzzle: the server received 5657. In 3–4 sentences, explain how HTTP makes sure a reader knows where a message ends, for both the headers and the body." revealLabel="Compare with a model answer">
+The headers end at the empty line. The body can contain any bytes, so nothing inside it can mark the end. Instead the sender states the length up front, usually with `Content-Length` (or chunked, or by closing the connection, for responses only). The reader reads exactly that many bytes and knows the next byte starts a new message. So two answers would arrive as two requests, each with its own length, and never fuse into `5657`.
+</Think>
+
+## Read alongside
+- 📖 **Primary:** [MDN: HTTP messages](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Messages), the parts about **responses** and the body (10 min).
+- [RFC 9112 §6.3, Message Body Length](https://www.rfc-editor.org/rfc/rfc9112#section-6.3): the exact rules, in order. Rules 6–8 are today's three ways.
+- [MDN: Content-Length](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Length).
+
+🙋 Anything fuzzy? Ask me. Good ones: "what does a chunked body look like?", "how does the client know the server closed?", "why was ::1 refused in curl -v?"
+
+**Next:** Lesson 6: methods (`GET` vs `POST`), status codes, and JSON bodies. Then you have all of HTTP that maths needs.

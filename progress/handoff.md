@@ -20,9 +20,10 @@ This repo is a self-taught backend course: a public GitHub Pages site plus a tea
   - **Lesson 2**: Processes, IP addresses, ports
   - **Lesson 3**: A connection is a pipe of bytes (bytes & text, connection, client vs server precisely)
   - **Lesson 4**: Protocols, and the HTTP request (H1, H2)
-- **Graded (2026-11-13):** L1–L3 understood (records 0002, 0003). L1's source-of-truth gap is closed (L3 recall 1). Small slips to re-check later: `-sTCP:LISTEN` (L4 recall 2), "bytes not text" phrasing.
-- **Waiting on the learner:** all Lesson 4 Think boxes (in the gist).
-- **Next to write:** Lesson 5, the HTTP response + where a message ends (H3, H4), using the draft's Content-Length experiments. Grade L4 first; `maths-l4-why-length` is their guess, check it in L5.
+  - **Lesson 5**: The response, and where a message ends (H3, H4)
+- **Graded (2026-11-13):** L1–L4 understood (records 0002–0004). Re-check later: they phrase the protocol question as "when does a new line start" (it's "where does a message end"); they wrote a Retrofit `{code}` placeholder and a trailing space in a request line (L5 recall 1).
+- **Waiting on the learner:** all Lesson 5 Think boxes (in the gist).
+- **Next to write:** Lesson 6, methods + status codes + JSON bodies (H5, H6, H7); the draft's status-code table and the `{"playerId":"p-42"}` exercise fit there. Then the draft can be deleted. Grade L5 first.
 - `maths/drafts/http-byte-by-byte.mdx` is an over-packed HTTP draft. Split it into Lessons 4–6 once their prerequisites are taught.
 
 ## Where the learner's answers are
