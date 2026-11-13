@@ -43,11 +43,11 @@ flowchart TB
 | B1 | **Process**: a running program, with a PID; it can sit waiting | (none) | 2 ✅ |
 | N1 | **IP address**: which machine; `127.0.0.1` means this one | (none) | 2 ✅ |
 | N2 | **Port**: which process on that machine; *listening* | B1, N1 | 2 ✅ |
-| B2 | **Bytes & text**: characters are bytes; `\n` and `\r\n` | (none) | 3 🔜 |
-| N3 | **Connection**: a two-way pipe of bytes between two processes; no message boundaries | N2, B2 | 3 🔜 |
-| N4 | **Client vs server, precisely**: the server listens, the client connects | N3 | 3 🔜 |
-| H1 | **Protocol**: agreed rules for the bytes in a connection | N3 | 4 |
-| H2 | **HTTP request**: request line, headers, empty line, body | H1, B2 | 4 |
+| B2 | **Bytes & text**: characters are bytes; `\n` and `\r\n` | (none) | 3 ✅ |
+| N3 | **Connection**: a two-way pipe of bytes between two processes; no message boundaries | N2, B2 | 3 ✅ |
+| N4 | **Client vs server, precisely**: the server listens, the client connects | N3 | 3 ✅ |
+| H1 | **Protocol**: agreed rules for the bytes in a connection | N3 | 4 🔜 |
+| H2 | **HTTP request**: request line, headers, empty line, body | H1, B2 | 4 🔜 |
 | H3 | **HTTP response**: status line, headers, body | H2 | 5 |
 | H4 | **Where a message ends**: `Content-Length` (and the alternatives) | H2, N3 | 5 |
 | H5 | **Methods**: `GET` vs `POST` | H2 | 6 |

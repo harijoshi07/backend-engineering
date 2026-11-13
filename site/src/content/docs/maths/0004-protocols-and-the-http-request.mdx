@@ -1,0 +1,229 @@
+---
+title: '4 · Protocols, and the HTTP request'
+description: A connection carries raw bytes. A protocol is the agreement that gives them meaning. Here's the one your Retrofit calls have always spoken, byte by byte.
+sidebar:
+  label: '4 · The HTTP request'
+  order: 4
+---
+
+import Quiz from '../../../components/Quiz.astro';
+import Think from '../../../components/Think.astro';
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+<Aside type="tip" title="Today: 2 bricks · ≈25 min">
+**protocol** → **HTTP request**. Win: you'll capture the exact bytes `curl` sends, then type a request by hand to a real server on the internet and get a real answer back.
+</Aside>
+
+## Recall (from memory)
+
+<Think id="maths-l4-recall-1" prompt="In lesson 3 the server received 5657. Why couldn't it tell the answers apart?" revealLabel="Check">
+A connection carries bytes in order and nothing more. It doesn't mark where one write ended, so `35 36` and `35 37` arrived as one run: `35 36 35 37`.
+</Think>
+
+<Think id="maths-l4-recall-2" prompt="lsof -nP -iTCP:8080 and lsof -nP -iTCP:8080 -sTCP:LISTEN print different things once a client is connected. What's the difference?" revealLabel="Check">
+Without `-sTCP:LISTEN`, lsof also shows the **connections** on port 8080 (the `ESTABLISHED` lines, one per end). With it, you see only the process **listening** there. To answer "is my server up?", you want the second.
+</Think>
+
+## Brick 1 · Protocol
+
+Lesson 3 ended on a problem: two writes, `56` and `57`, arrived as `5657`. The pipe can't fix that. **The two programs have to agree on rules for their bytes.** That agreement is a **protocol** ([MDN: Protocol](https://developer.mozilla.org/en-US/docs/Glossary/Protocol)).
+
+Every protocol answers three questions:
+1. **Who speaks first**, and who replies?
+2. **Where does each message end?**
+3. **What do the bytes mean?**
+
+We can invent one right now. Call it *maths-v0*: the client sends `ANSWER <number>` and ends each message with `\n`. A server that follows it reads up to `\n`, and that's one answer. With `nc -l 8080` running in another window:
+
+```bash
+{ printf 'ANSWER 56\n'; printf 'ANSWER 57\n'; } | nc localhost 8080
+```
+
+```text
+ANSWER 56
+ANSWER 57
+```
+
+Same pipe as lesson 3, but now there are two answers, not `5657`. Nothing about the connection changed. Only the agreement did.
+
+You'll never ship maths-v0. Inventing protocols is how systems end up with a thousand incompatible ones. Instead, everyone agrees on **HTTP**: every phone, server, library and tool already speaks it. Here's how HTTP answers the three questions:
+1. **The client speaks first** with a **request**, and the server replies with one **response**. *This* is where lesson 1's rule comes from: HTTP's rule, not the pipe's.
+2. Messages are made of **lines that end with `\r\n`**, then an empty line, then an optional body.
+3. The first line says **what the client wants**. The next lines add details.
+
+## Brick 2 · The HTTP request
+
+Your Retrofit code has always written HTTP. This interface:
+
+```kotlin
+interface MathsApi {
+    @GET("duels/{code}")
+    suspend fun duel(@Path("code") code: String): Duel
+}
+```
+
+called as `api.duel("K7QM")`, makes OkHttp write a request into a connection. Here's what `curl` writes for the same request. I captured it by pointing `curl` at `nc -l 8080 | cat -v`. `cat -v` shows invisible bytes, so `\r` appears as `^M`:
+
+```text
+GET /duels/K7QM HTTP/1.1^M
+Host: localhost:8080^M
+User-Agent: curl/8.7.1^M
+Accept: */*^M
+^M
+```
+
+That's the entire request: 5 lines of text. Taken apart:
+
+```text
+ ┌─ request line ──────────────────────────────┐
+ │ GET   /duels/K7QM   HTTP/1.1          \r\n  │   method · target · version
+ ├─ headers: one "Name: value" per line ───────┤
+ │ Host: localhost:8080                  \r\n  │   which site you mean
+ │ User-Agent: curl/8.7.1                \r\n  │   which client program
+ │ Accept: */*                           \r\n  │   what replies it can read
+ ├─ empty line ────────────────────────────────┤
+ │                                       \r\n  │   "headers are over"
+ └─────────────────────────────────────────────┘
+```
+
+- **Request line.** The **method** (`GET`, "give me this"; lesson 6 covers the others), the **target**, which is the path that names the thing you want, and the protocol version.
+- **Headers.** Extra details, one per line. **`Host`** is the only one HTTP/1.1 requires, because one IP address can serve many websites, so the client must say which one it means. A server "MUST respond with a 400 (Bad Request)" to a request without it ([RFC 9112 §3.2](https://www.rfc-editor.org/rfc/rfc9112#section-3.2)). You'll trigger that below.
+- **The empty line** (`\r\n` on its own) is how the server knows the headers are finished. Until it arrives, the server keeps waiting for more.
+
+Some requests carry a **body** after the empty line. Sending your answer will look like this (also captured from `curl`):
+
+```text
+POST /duels/K7QM/answers HTTP/1.1^M
+Host: localhost:8080^M
+User-Agent: curl/8.7.1^M
+Accept: */*^M
+Content-Type: application/json^M
+Content-Length: 13^M
+^M
+{"answer":56}
+```
+
+There's the JSON from your data classes, as plain bytes after the empty line. The standard sums up the shape in one line of grammar: a start line, header lines, an empty line, then an optional body ([RFC 9112 §2.1](https://www.rfc-editor.org/rfc/rfc9112#section-2.1)).
+
+<Think id="maths-l4-why-length" prompt="curl added Content-Length: 13 on its own. Using lesson 3, why do you think the server needs it?" />
+
+## Hands-on
+
+<Steps>
+
+1. **Capture a request.** Window A:
+
+   ```bash
+   nc -l 8080 | cat -v
+   ```
+
+   Window B:
+
+   ```bash
+   curl http://localhost:8080/duels/K7QM
+   ```
+
+   Window A shows the request above, `^M`s and all. `curl` will sit there waiting for a response, because `nc` never sends one. Press Ctrl+C in both windows.
+
+2. **Be the client, against a real server.** `example.com` is a public test site. `nc -c` sends `\r\n` when you press Enter ([`man nc`](https://man.openbsd.org/nc.1)):
+
+   ```bash
+   nc -c example.com 80
+   ```
+
+   Type these two lines, then press Enter once more for the empty line:
+
+   ```text
+   GET / HTTP/1.1
+   Host: example.com
+
+   ```
+
+   I got (first lines):
+
+   ```text
+   HTTP/1.1 200 OK
+   Date: Fri, 13 Nov 2026 09:28:12 GMT
+   Content-Type: text/html; charset=utf-8
+   ...
+   Server: cloudflare
+   ```
+
+   Then a page of HTML. That's a **response**. Lesson 5 takes it apart. For now, notice it has the same shape: a first line, headers, an empty line, a body. Press Ctrl+C to close.
+
+3. **Break the rules.** Do it again, but skip the `Host` line: type `GET / HTTP/1.1`, then press Enter twice.
+
+   ```text
+   HTTP/1.1 400 Bad Request
+   Server: cloudflare
+   ...
+   ```
+
+   The connection worked and the bytes arrived, but they broke HTTP's rules, so the server refused the request. A protocol is a contract, and servers enforce it.
+
+</Steps>
+
+<Aside type="note" title="The thing to remember">
+A **protocol** is the agreed meaning of the bytes in a connection. An **HTTP request** is text: a request line (method, target, version), `Name: value` headers, an empty line, then an optional body. Every line ends with `\r\n`.
+</Aside>
+
+## Check yourself
+
+<Quiz
+  question="What tells the server that the request's headers are finished?"
+  options={[
+    'A header line named End',
+    'The final Content-Length header line',
+    'An empty line, just \\r\\n',
+  ]}
+  answer={2}
+>
+The empty line is the only "headers done" signal. Without it, the server keeps waiting for more headers.
+</Quiz>
+
+<Quiz
+  question="In GET /duels/K7QM HTTP/1.1, which part names the thing you want?"
+  options={[
+    'The target, /duels/K7QM',
+    'The method, GET',
+    'The version, HTTP/1.1',
+  ]}
+  answer={0}
+>
+The target is the path. The method says what kind of action, and the version says which HTTP rules apply.
+</Quiz>
+
+<Quiz
+  question="You leave out the Host line. What does an HTTP/1.1 server do?"
+  options={[
+    'Guesses the site from the IP',
+    'Rejects it with a 400 response',
+    'Waits for the Host line forever',
+  ]}
+  answer={1}
+>
+The standard says the server MUST answer `400 Bad Request`, and Cloudflare did exactly that in step 3.
+</Quiz>
+
+## Your turn
+
+<Think id="maths-l4-write" prompt="The maths server runs on your laptop at 192.168.1.88:8080. Write the exact request a phone sends to read duel K7QM: every line, and mark where each \r\n goes." revealLabel="Check against the answer">
+```text
+GET /duels/K7QM HTTP/1.1\r\n
+Host: 192.168.1.88:8080\r\n
+\r\n
+```
+That's the minimum. Real clients add more headers (OkHttp sends `User-Agent: okhttp/…` and `Accept-Encoding: gzip`, for example), but `Host` is the only required one. Forgot the last `\r\n`? Then the server is still waiting for headers.
+</Think>
+
+<Think id="maths-l4-teachback" prompt="In 2–3 sentences: what is a protocol, and how does HTTP answer its three questions?" revealLabel="Compare with a model answer">
+A protocol is the set of rules two programs agree on for the bytes they send through a connection. HTTP says the client speaks first with a request and the server replies with one response. Messages are lines ending in `\r\n`, then an empty line and an optional body, and the request line says what the client wants (method and target).
+</Think>
+
+## Read alongside
+- 📖 **Primary:** [MDN: HTTP messages](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Messages), the parts about **requests** (10 min). Skip responses until lesson 5.
+- [RFC 9112 §2.1](https://www.rfc-editor.org/rfc/rfc9112#section-2.1) and [§3](https://www.rfc-editor.org/rfc/rfc9112#section-3): the real standard. Short, and now readable.
+
+🙋 Anything fuzzy? Ask me. Good ones: "what's `Accept: */*`?", "why port 80 for example.com?", "what does OkHttp send that curl doesn't?"
+
+**Next:** Lesson 5: the response, and how the reader knows where a body ends. Your `Content-Length` guess gets checked.
