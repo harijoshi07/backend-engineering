@@ -1,0 +1,217 @@
+---
+title: '3 · A connection is a pipe of bytes'
+description: What actually travels from the phone to the server. Text becomes bytes, a connection carries them both ways, and nothing marks where one message ends.
+sidebar:
+  label: '3 · A pipe of bytes'
+  order: 3
+---
+
+import Quiz from '../../../components/Quiz.astro';
+import Think from '../../../components/Think.astro';
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+<Aside type="tip" title="Today: 3 bricks · ≈25 min">
+**bytes & text** → **connection** → **client vs server, precisely**. Win: you'll open a real connection between two processes, see both ends of it in `lsof`, and catch two messages fusing into one.
+</Aside>
+
+## Recall (from memory)
+
+<Think id="maths-l3-recall-1" prompt="Sita's app sends 65 and claims it's correct. What exactly does the server do with that claim, and what does it check instead?" revealLabel="Check">
+It ignores the claim. A phone's word is never evidence. The server compares the `value` it received against **its own** `correctAnswer` (56), and 65 doesn't match. "Not handled" isn't the reason: the server handles it fine, it just never trusts what the phone says about correctness.
+</Think>
+
+<Think id="maths-l3-recall-2" prompt="Write the full command that shows which process is listening on port 8080. What does it mean if it prints nothing?" revealLabel="Check">
+`lsof -nP -iTCP:8080 -sTCP:LISTEN`. Empty output means no process is listening on 8080, so a client trying to connect gets *refused*.
+</Think>
+
+## The question for today
+
+In lesson 2 a client reached `192.168.1.88:8080`: one listening process on one machine. Now the phone wants to send its answer, `56`. **What actually travels to the server, and how?**
+
+Two answers, one per brick: what travels is **bytes**, and they travel through a **connection**.
+
+## Brick 1 · Bytes and text
+
+A **byte** is the unit computers store and send: 8 bits, a number from 0 to 255, usually written in hexadecimal (`00` to `ff`). Memory, files and networks only ever hold bytes. **Text is a convention on top**: an *encoding* maps each character to one or more bytes. The encoding everyone uses is **UTF-8**.
+
+You've already done this: in Kotlin, `"56".encodeToByteArray()` turns a string into its UTF-8 bytes ([Kotlin docs](https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.text/encode-to-byte-array.html)). Whenever your app sends text anywhere, that conversion happens somewhere.
+
+The tool `xxd` prints the bytes of anything you give it:
+
+```bash
+printf 'Hi\n' | xxd
+printf '56\r\n' | xxd
+printf '7×8' | xxd
+```
+
+```text
+00000000: 4869 0a                                  Hi.
+00000000: 3536 0d0a                                56..
+00000000: 37c3 9738                                7..8
+```
+
+Read the middle column in pairs: `48 69 0a` is three bytes. Three facts:
+- **Digits are characters, not numbers.** The text `56` is two bytes, `35 36`. It's not the number 56.
+- **A line break is a byte, too.** `\n` (newline) is `0a`. `\r\n` (carriage return + newline) is two bytes, `0d 0a`. You'll meet `\r\n` again in lesson 4, because HTTP ends every line with it.
+- **Characters ≠ bytes.** `×` is *one* character but *two* bytes (`c3 97`) in UTF-8, so `7×8` is 3 characters and 4 bytes.
+
+The same check in Kotlin, if you want to see it there ([play.kotlinlang.org](https://play.kotlinlang.org)):
+
+```kotlin
+fun main() {
+    for (s in listOf("56\n", "7×8")) {
+        val bytes = s.encodeToByteArray()
+        println("${s.length} chars, ${bytes.size} bytes: " + bytes.joinToString(" ") { "%02x".format(it) })
+    }
+}
+```
+
+```text
+3 chars, 3 bytes: 35 36 0a
+3 chars, 4 bytes: 37 c3 97 38
+```
+
+## Brick 2 · Connection
+
+A **connection** is a two-way pipe of bytes between **two processes**, possibly on different machines. Once it's open:
+- either end can write bytes into it, at any time,
+- the other end reads them **in the same order** they were written, none lost.
+
+One end is always the listening process from lesson 2. The other is the process that reached out to it. Each end is an `IP:port`, so a connection is named by **two** of them:
+
+```text
+   client process                                     server process
+   127.0.0.1:65276  ◀════ bytes, both directions ════▶  127.0.0.1:8080
+   (port picked by the OS)                             (the listening port)
+```
+
+The client also needs a port for its end. It doesn't choose one: the OS hands it a free, temporary number (like `65276` above).
+
+The pipe has one property that surprises everyone: **it carries bytes, not messages.** If the client writes `56` and later writes `57`, the server just receives the bytes `35 36 35 37`. Nothing in the pipe marks where the first write ended. If the two sides want separate messages, *they* must agree on how to mark the end, for example "a message ends at `\n`". That agreement is the subject of lessons 4 and 5.
+
+> In networking books this pipe is called a **TCP connection**, and each end of it, as a program sees it, a **socket**. The standard describes TCP as "a reliable, in-order, byte-stream service" ([RFC 9293 §2.2](https://www.rfc-editor.org/rfc/rfc9293#section-2.2)). Every word of that you now know.
+
+## Brick 3 · Client vs server, precisely
+
+Lesson 1 said "the client always speaks first". Now we can be exact:
+- The **server** is the process that **listens** on a port and waits.
+- The **client** is the process that **connects** to it, because it knows the server's `IP:port`.
+
+That's the *whole* difference, and it's only about **who opened the connection**. Once it's open, the pipe is symmetric: the server could write first. "The client speaks first" is a rule that HTTP adds on top (lesson 4), not a property of the pipe. Hold on to that: it's exactly why, in lesson 22, the server will struggle to tell your phone that Sita scored.
+
+## Hands-on: open a connection yourself
+
+You need three Terminal windows: **A** (server), **B** (client), **C** (observer).
+
+<Steps>
+
+1. **Start a server.** Window A:
+
+   ```bash
+   nc -l 8080
+   ```
+
+2. **Connect a client.** Window B (no `-l`: this `nc` connects instead of listening):
+
+   ```bash
+   nc localhost 8080
+   ```
+
+3. **Look at both ends.** Window C:
+
+   ```bash
+   lsof -nP -iTCP:8080
+   ```
+
+   On my Mac:
+
+   ```text
+   COMMAND   PID       USER   FD   TYPE  ...  NODE NAME
+   nc      30650 hari.joshi    3u  IPv4  ...   TCP *:8080 (LISTEN)
+   nc      30650 hari.joshi    4u  IPv4  ...   TCP 127.0.0.1:8080->127.0.0.1:65276 (ESTABLISHED)
+   nc      30653 hari.joshi    5u  IPv4  ...   TCP 127.0.0.1:65276->127.0.0.1:8080 (ESTABLISHED)
+   ```
+
+   Three lines, two processes. PID 30650 (the server) still has its **LISTEN** line *and* now holds one end of a connection. PID 30653 (the client) holds the other end, on port 65276, which the OS picked. Each `ESTABLISHED` line names the same connection from its own side.
+
+4. **Send both ways.** Type `from client` in window B and press Enter: it appears in A. Now type `7 x 8 = ?` in window **A**: it appears in B. The *server* just spoke first. The pipe doesn't care.
+
+5. **Catch two writes fusing.** Stop both with Ctrl+C. Window A, a server that shows raw bytes:
+
+   ```bash
+   nc -l 8080 | xxd
+   ```
+
+   <Think id="maths-l3-predict" prompt="Window B is about to write 56, wait a second, then write 57 and a newline. Predict what window A prints." />
+
+   Window B:
+
+   ```bash
+   { printf '56'; sleep 1; printf '57\n'; } | nc localhost 8080
+   ```
+
+   I got:
+
+   ```text
+   00000000: 3536 3537 0a                             5657.
+   ```
+
+   Two writes, a second apart, arrived as one run of bytes: `5657`. Was that the answer *56* and *57*, or the answer *5657*? The server can't know. Bytes arrived, in order, and nothing more.
+
+</Steps>
+
+<Aside type="note" title="The thing to remember">
+Text is bytes. A connection carries bytes both ways, in order, between a client (connected) and a server (listened). It **does not** mark where a message ends. The two sides must agree on that themselves.
+</Aside>
+
+## Check yourself
+
+<Quiz
+  question="How many bytes does the text 56 followed by a newline take?"
+  options={[
+    'Two bytes, one per digit',
+    'Three bytes, newline counts too',
+    'One byte, it is a number',
+  ]}
+  answer={1}
+>
+`35 36 0a`: one byte per digit and one for `\n`. The text `56` is characters, not the number 56.
+</Quiz>
+
+<Quiz
+  question="The client writes 56, then later 57. Can the server tell where 56 ended?"
+  options={[
+    'Yes, each write arrives as one',
+    'Only if both run on localhost',
+    'No, the pipe has no boundaries',
+  ]}
+  answer={2}
+>
+A connection is a stream of bytes. The server reads `35 36 35 37` with no marker between the writes, wherever the processes run.
+</Quiz>
+
+<Quiz
+  question="What makes one process the server of a connection?"
+  options={[
+    'It listens, the client connects to it',
+    'It always sends the very first message',
+    'It runs on a more powerful machine',
+  ]}
+  answer={0}
+>
+Only who opened the connection. In step 4 the server wrote first, and it was still the server.
+</Quiz>
+
+## Your turn
+
+<Think id="maths-l3-teachback" prompt="Your phone sends the answer 56 to the maths server. In 3–4 sentences, describe what travels and how, using today's three bricks: what 56 becomes, who listens and who connects, and why the server needs an agreed way to know the answer has ended." revealLabel="Compare with a model answer">
+The text `56` becomes bytes, `35 36`, in UTF-8. The server process is listening on `IP:8080`; the phone connects to it, and the OS gives the phone's end a temporary port. The phone writes the bytes into the connection and the server reads them in the same order. But the pipe doesn't mark where a message ends, so if the server just reads, it could get `5`, or `56`, or `5657` if a second answer follows. The two sides need a rule, such as "an answer ends at `\n`".
+</Think>
+
+## Read alongside
+- 📖 **Primary:** [Beej's Guide to Network Programming](https://beej.us/guide/bgnet/html/), the sections ["What is a socket?"](https://beej.us/guide/bgnet/html/#what-is-a-socket) and ["Two Types of Internet Sockets"](https://beej.us/guide/bgnet/html/#two-types-of-internet-sockets). Stream sockets are today's pipe. Skip the parts about datagrams.
+- [RFC 9293 §2.2, Key TCP Concepts](https://www.rfc-editor.org/rfc/rfc9293#section-2.2): one paragraph, the standard's own wording.
+
+🙋 Anything fuzzy? Ask me. Good ones: "why hexadecimal?", "what are `3u` and `4u` in lsof?", "what happens to the bytes if the server never reads them?"
+
+**Next:** Lesson 4: a protocol, the agreed rules for the bytes in a connection, and the first one you'll read byte by byte: HTTP.

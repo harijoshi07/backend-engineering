@@ -18,10 +18,10 @@ This repo is a self-taught backend course: a public GitHub Pages site plus a tea
 - Published:
   - **Lesson 1**: Why the game needs a server (source of truth; client/server)
   - **Lesson 2**: Processes, IP addresses, ports
-- **Waiting on the learner:**
-  - L1: predicted output, the "cheat differently" answer, the explain-it-back answer.
-  - L2: recall answers, and three reasons a phone gets "can't connect".
-- **Next to write:** Lesson 3, "A connection is a pipe of bytes" (concepts B2 bytes & text, N3 connection, N4 client/server precisely). Grade the replies first, and write learning records only when the learner shows real understanding.
+  - **Lesson 3**: A connection is a pipe of bytes (bytes & text, connection, client vs server precisely)
+- **Graded (2026-11-13):** L2 bricks (process, IP, port) understood. Gap: L1 "cheat differently" (they said the server rejects 65 because it's "not handled"; it's because the server checks its own key and ignores the claim). Re-asked as L3 recall 1. L1 teach-back named no reasons, but L2 recall 1 gave both.
+- **Waiting on the learner:** all Lesson 3 Think boxes (in the gist).
+- **Next to write:** Lesson 4, protocol + HTTP request (H1, H2). Grade L3 first.
 - `maths/drafts/http-byte-by-byte.mdx` is an over-packed HTTP draft. Split it into Lessons 4–6 once their prerequisites are taught.
 
 ## Where the learner's answers are
