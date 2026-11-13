@@ -21,10 +21,10 @@ This repo is a self-taught backend course: a public GitHub Pages site plus a tea
   - **Lesson 3**: A connection is a pipe of bytes (bytes & text, connection, client vs server precisely)
   - **Lesson 4**: Protocols, and the HTTP request (H1, H2)
   - **Lesson 5**: The response, and where a message ends (H3, H4)
-- **Graded (2026-11-13):** L1–L4 understood (records 0002–0004). Re-check later: they phrase the protocol question as "when does a new line start" (it's "where does a message end"); they wrote a Retrofit `{code}` placeholder and a trailing space in a request line (L5 recall 1).
-- **Waiting on the learner:** all Lesson 5 Think boxes (in the gist).
-- **Next to write:** Lesson 6, methods + status codes + JSON bodies (H5, H6, H7); the draft's status-code table and the `{"playerId":"p-42"}` exercise fit there. Then the draft can be deleted. Grade L5 first.
-- `maths/drafts/http-byte-by-byte.mdx` is an over-packed HTTP draft. Split it into Lessons 4–6 once their prerequisites are taught.
+  - **Lesson 6**: Methods, status codes, JSON (H5, H6, H7). HTTP layer complete.
+- **Graded (2026-11-13):** L1–L5 (records 0002–0005). L5 teach-back showed two misconceptions, re-asked as L6 recall: they think the connection closes after a Content-Length body (it stays open; close is the *no-length* method), and they called the server's incoming message a "response".
+- **Waiting on the learner:** all Lesson 6 Think boxes (in the gist).
+- **Next to write:** Lesson 7, a server is a loop + a Kotlin server by hand with `ServerSocket` (S1, S2). The learner writes this code; the lesson guides, it doesn't hand over a finished server. Grade L6 first.
 
 ## Where the learner's answers are
 Every question in a lesson is a `Think` box. Answers sync to the learner's **secret gist "backend-engineering answers"** (`<think-id>.md`), from the site on any device once they've pasted a gist-scoped token, and from chat (Claude writes them there). Fetch from the gist before grading: `gh gist list | grep 'backend-engineering answers'`.

@@ -1,0 +1,246 @@
+---
+title: '6 · Methods, status codes, JSON'
+description: The three parts of HTTP that turn bytes into an API. What the client wants to do, how the server says how it went, and how both sides know the body is JSON.
+sidebar:
+  label: '6 · Methods, codes, JSON'
+  order: 6
+---
+
+import Quiz from '../../../components/Quiz.astro';
+import Think from '../../../components/Think.astro';
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+<Aside type="tip" title="Today: 3 bricks · ≈25 min">
+**methods** → **status codes** → **JSON bodies**. Win: you'll send the maths answer as real JSON to a real server, get it parsed back, then break it three ways and read each verdict. After today you know all the HTTP that maths needs.
+</Aside>
+
+## Recall (from memory)
+
+<Think id="maths-l6-recall-1" prompt="A response says Content-Length: 11. What happens to the connection after the 11th byte? And how does a reader find the end of a response that has no Content-Length (and isn't chunked)?" revealLabel="Check">
+With `Content-Length`, the connection **stays open** ("left intact"), ready for the next request. Not closing is the whole point. Without it, the reader waits until the server **closes** the connection. It doesn't wait forever: the close is the end.
+</Think>
+
+<Think id="maths-l6-recall-2" prompt="The maths server receives your answer. Is that a request or a response? And if it has no Content-Length and isn't chunked, how big is its body?" revealLabel="Check">
+A **request**: the server reads requests and writes responses. A request with neither header has **no body** (length zero). The server doesn't wait for one, because "until the connection closes" is impossible for a request: the client still needs the connection to read the reply ([RFC 9112 §6.3](https://www.rfc-editor.org/rfc/rfc9112#section-6.3), rule 7).
+</Think>
+
+## The example for today
+
+The maths phone app will call your server like this:
+
+```kotlin
+interface MathsApi {
+    @GET("duels/{code}")
+    suspend fun duel(@Path("code") code: String): Duel
+
+    @POST("duels/{code}/answers")
+    suspend fun answer(@Path("code") code: String, @Body body: AnswerBody): AnswerResult
+}
+data class AnswerBody(val answer: Int)
+```
+
+You know all of a request's bytes now, except three things these annotations decide: **`@GET` vs `@POST`**, the **status code** that comes back, and the **JSON** in `@Body`. One brick each.
+
+## Brick 1 · Methods
+
+The **method** is the first word of the request line. It tells the server what *kind* of action you want. Maths needs two ([RFC 9110 §9.3](https://www.rfc-editor.org/rfc/rfc9110#section-9.3)):
+
+| Method | Means | Body? | In maths |
+|---|---|---|---|
+| **`GET`** | "give me the current state of this". **Changes nothing** on the server. | no | `GET /duels/K7QM`: read the duel and its scores |
+| **`POST`** | "process this body": create something, or submit something | yes | `POST /duels`: create a duel. `POST /duels/K7QM/answers`: submit an answer |
+
+The standard calls `GET` **safe**: a client may send it any number of times without changing anything ([RFC 9110 §9.2.1](https://www.rfc-editor.org/rfc/rfc9110#section-9.2.1)). Phones, browsers and proxies rely on that, for example to retry or cache a `GET`. So if reading a duel ever *changed* it, that would be a bug.
+
+Method and target go together. On the server, the pair `POST /duels/K7QM/answers` picks which code runs (that's routing, lesson 9). A server that has the path but not that method answers **`405 Method Not Allowed`**.
+
+## Brick 2 · Status codes
+
+The status code is the server's one-number verdict, in the status line. **The first digit is the category** ([RFC 9110 §15](https://www.rfc-editor.org/rfc/rfc9110#section-15)):
+
+| Class | Means | Whose fault |
+|---|---|---|
+| **2xx** | it worked | nobody's |
+| **4xx** | the request is wrong: retrying the same bytes won't help | the **client's** |
+| **5xx** | the server failed while handling a valid request | the **server's** |
+
+(There's also 3xx, "look elsewhere", for redirects. Maths doesn't need it.)
+
+The ones maths will use:
+
+| Code | When, in maths |
+|---|---|
+| `200 OK` | answer checked, here's the result: `{"correct":true}` |
+| `201 Created` | `POST /duels` made a new duel: `{"code":"K7QM"}` |
+| `400 Bad Request` | the body is malformed: `{"answer":"fifty-six"}` |
+| `404 Not Found` | no such duel: `POST /duels/ZZZZ/answers` |
+| `409 Conflict` | the request is fine, but the duel's **current state** forbids it: answering after the 60 seconds |
+| `500 Internal Server Error` | a bug in your code threw an exception |
+
+In Retrofit, `response.isSuccessful()` is exactly "the code is 2xx". Until now *you* branched on these codes. From now on, your server **chooses** them, and a wrong choice misleads every client. Return `500` for a bad answer, and the app shows "server error, try later" when the player just typed nonsense.
+
+## Brick 3 · JSON bodies
+
+A body is bytes. **`Content-Type`** is the header that says what those bytes are ([RFC 9110 §8.3](https://www.rfc-editor.org/rfc/rfc9110#section-8.3)). For JSON, it's `application/json`. Without it, the reader has to guess, and guesses wrong. You'll see that below.
+
+Retrofit's JSON converter (Moshi, Gson or kotlinx.serialization) does two things on each call: it turns `AnswerBody(56)` into the bytes `{"answer":56}`, and it adds `Content-Type: application/json`. On the server, Spring will do the reverse: read the header, then parse the bytes into a Kotlin data class.
+
+So the full request your app sends to submit an answer is:
+
+```text
+POST /duels/K7QM/answers HTTP/1.1
+Host: 192.168.1.88:8080
+Content-Type: application/json
+Content-Length: 13
+
+{"answer":56}
+```
+
+Every line of that, you can now explain.
+
+## Hands-on: a real JSON server
+
+`httpbin.org` is a public test server that echoes back what you sent it, already parsed. `-i` makes `curl` show the status line and headers too.
+
+<Steps>
+
+1. **A correct JSON POST.**
+
+   ```bash
+   curl -i -X POST http://httpbin.org/post \
+     -H 'Content-Type: application/json' -d '{"answer":56}'
+   ```
+
+   I got (some headers trimmed):
+
+   ```text
+   HTTP/1.1 200 OK
+   content-length: 363
+   content-type: application/json
+
+   {
+     "headers": {
+       "Content-Length": "13",
+       "Content-Type": "application/json",
+       "Host": "httpbin.org",
+       ...
+     },
+     "method": "POST",
+     "data": "{\"answer\":56}",
+     "form": {},
+     "json": {
+       "answer": 56
+     }
+   }
+   ```
+
+   Everything you've learned is in that response. The status is `200`. The response has its own `content-length` and `content-type`, because the server's JSON needs them too. And `"json": {"answer": 56}` means the server **parsed** your bytes as JSON. (Header names may be lowercase. They're case-insensitive: [RFC 9110 §5.1](https://www.rfc-editor.org/rfc/rfc9110#section-5.1).)
+
+2. **Same bytes, no `Content-Type`.** Drop the `-H` line:
+
+   ```bash
+   curl -X POST http://httpbin.org/post -d '{"answer":56}'
+   ```
+
+   ```text
+       "Content-Type": "application/x-www-form-urlencoded",
+     ...
+     "form": {
+       "{\"answer\":56}": ""
+     },
+     "json": null
+   ```
+
+   `curl` labelled the body as an HTML form, the default for `-d`, and the server believed it: it parsed your JSON as a form field with a strange name, and `json` is `null`. **Same body bytes, different meaning, decided by one header.**
+
+3. **Wrong method.** `/get` only accepts `GET`:
+
+   ```bash
+   curl -i -X POST http://httpbin.org/get
+   ```
+
+   ```text
+   HTTP/1.1 405 Method Not Allowed
+   ```
+
+4. **Wrong target.**
+
+   ```bash
+   curl -i http://httpbin.org/nothing-here
+   ```
+
+   ```text
+   HTTP/1.1 404 Not Found
+   ```
+
+   Both are 4xx: the server is fine, the request was wrong.
+
+</Steps>
+
+<Aside type="note" title="The thing to remember">
+The **method** says what kind of action (`GET` reads and changes nothing; `POST` submits a body). The **status code** is the verdict (2xx worked, 4xx client's mistake, 5xx server's). **`Content-Type`** says how to read the body; for JSON it's `application/json`.
+</Aside>
+
+## Check yourself
+
+<Quiz
+  question="The app wants to show duel K7QM's current scores. Which request fits?"
+  options={[
+    'GET, because it only reads state',
+    'POST, because it sends a request',
+    'POST, because scores are sensitive data',
+  ]}
+  answer={0}
+>
+Reading changes nothing, so it's `GET`. Every method "sends a request", and sensitivity has nothing to do with the method.
+</Quiz>
+
+<Quiz
+  question={'The phone sends {"answer":"fifty-six"}. Which status should the server return?'}
+  options={[
+    '500, the server could not parse',
+    '409, the duel state forbids it',
+    '400, the request itself is malformed',
+  ]}
+  answer={2}
+>
+The server didn't break: the request is wrong, and sending the same bytes again won't help. That's a 4xx, and specifically `400`. `409` is for a valid request that the duel's current state forbids.
+</Quiz>
+
+<Quiz
+  question="The body is JSON, but the request has no Content-Type. What can happen?"
+  options={[
+    'The server always detects JSON automatically',
+    'The server may misread the body',
+    'The connection is closed right away',
+  ]}
+  answer={1}
+>
+That's step 2: `httpbin` read your JSON as a form field. The reader goes by the header, not by looking at the bytes.
+</Quiz>
+
+## Your turn
+
+<Think id="maths-l6-write" prompt="Write the exact raw request for Sita (player id p-42) joining duel K7QM: POST /duels/K7QM/players with the JSON body {&quot;playerId&quot;:&quot;p-42&quot;}, to the server at 192.168.1.88:8080. Include every line and the correct Content-Length." revealLabel="Check against the answer">
+```text
+POST /duels/K7QM/players HTTP/1.1\r\n
+Host: 192.168.1.88:8080\r\n
+Content-Type: application/json\r\n
+Content-Length: 19\r\n
+\r\n
+{"playerId":"p-42"}
+```
+`{"playerId":"p-42"}` is 19 bytes: `{` 1 + `"playerId"` 10 + `:` 1 + `"p-42"` 6 + `}` 1. Check it with `printf '{"playerId":"p-42"}' | wc -c`.
+</Think>
+
+<Think id="maths-l6-codes" prompt="Pick a status code for each, with a few words of why: (a) Sita joins K7QM, but it already has two players. (b) You read duel QQQQ, which never existed. (c) Your answer is checked and it's correct. (d) Your server code throws a NullPointerException while checking an answer." revealLabel="Check">
+(a) **`409`**: the request is valid, but the duel's state (full) forbids it. (b) **`404`**: no such duel. (c) **`200`**: it worked, with the result in the body. (d) **`500`**: the server's own bug, and the client did nothing wrong. (a) is the subtle one: `400` would claim the *request* was malformed, and it wasn't.
+</Think>
+
+## Read alongside
+- 📖 **Primary:** [MDN: HTTP request methods](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Methods) (just `GET` and `POST`) and [MDN: HTTP response status codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status) (skim the class headings and the six codes above). 15 min.
+- [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110): §9.3.1 (GET), §9.3.3 (POST), §15 (status codes), when you want the exact rule.
+
+🙋 Anything fuzzy? Ask me. Good ones: "what about PUT and DELETE?", "why not return 200 with an error inside the JSON?", "what's the charset=UTF-8 OkHttp adds?"
+
+**Next:** Lesson 7: a server is a loop. You'll write one in Kotlin by hand, and it'll speak everything from lessons 3–6.
