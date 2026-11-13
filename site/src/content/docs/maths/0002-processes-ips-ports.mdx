@@ -1,6 +1,6 @@
 ---
 title: '2 · Processes, IP addresses, ports'
-description: What nc was actually doing in lesson 1. Three bricks, and every one of them shows up in an address like 192.168.1.88:8080.
+description: Before an answer can travel from a phone to the server, it needs an address. Three bricks, all visible in 192.168.1.88:8080.
 sidebar:
   label: '2 · Processes, IPs, ports'
   order: 2
@@ -15,8 +15,8 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 </Aside>
 
 ## Recall (from memory)
-1. In lesson 1, which terminal window was the server?
-2. Why must the server, not the phones, decide who answered first?
+1. Give the two reasons the phones can't decide who answered first.
+2. In a Retrofit call, which side is the client, and which message comes first?
 
 ## The example we'll take apart
 
@@ -37,8 +37,8 @@ A **program** is a file on disk, e.g. `/usr/bin/nc`. A **process** is that progr
 You've seen this already. Logcat has a PID column, and every Android app runs as its own process. When Android kills your app in the background, that's the process ending ([Android docs: Logcat](https://developer.android.com/studio/debug/logcat)).
 
 Two facts about processes that we'll build on:
-- **One program can run as many processes.** Open two terminals and run `nc` in both: same file, two processes, two PIDs.
-- **A process can sit and wait.** `nc -l 8080` used almost no CPU. It was *blocked*, asleep until something arrived. A server spends most of its life like that.
+- **One program can run as many processes.** Run the same command in two Terminal windows: same file, two processes, two PIDs.
+- **A process can sit and wait.** It can be *blocked*: asleep, using no CPU, until something arrives for it. A server spends most of its life like that, and you'll watch one do it below.
 
 > Source: *Operating Systems: Three Easy Pieces*, ch. 4 ["The Abstraction: The Process"](https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-intro.pdf) (free; the first 3 pages are enough today).
 
@@ -46,7 +46,7 @@ Two facts about processes that we'll build on:
 
 An **IP address** is the number that identifies a machine on a network, like `192.168.1.88` ([MDN: IP address](https://developer.mozilla.org/en-US/docs/Glossary/IP_Address)). When your phone sends something to `192.168.1.88`, the Wi-Fi router delivers it to the laptop with that address.
 
-One address is special: **`127.0.0.1`**, also called **`localhost`**, always means **"this same machine"**. Anything sent there never leaves the computer. That's why lesson 1 worked without any network: `curl` and `nc` were on the same Mac.
+One address is special: **`127.0.0.1`**, also called **`localhost`**, always means **"this same machine"**. Anything sent there never leaves the computer. That's why today's exercises need no network at all: everything runs on your Mac.
 
 ```text
   📱 phone ── "192.168.1.88" ──▶ Wi-Fi router ──▶ 💻 laptop (192.168.1.88)
@@ -59,7 +59,7 @@ So the phone uses the laptop's **network address**, and the laptop talks to itse
 
 A laptop runs hundreds of processes. When bytes arrive at `192.168.1.88`, which process gets them? The **port** decides. It's a number from 0 to 65535 ([MDN: Port](https://developer.mozilla.org/en-US/docs/Glossary/Port)).
 
-A process **listens** on a port. That means it tells the OS "anything arriving for port 8080, hand it to me". That is exactly what `nc -l 8080` did: `-l` stands for *listen*.
+A process **listens** on a port. That means it tells the OS "anything arriving for port 8080, hand it to me". A server is a process that listens.
 
 ```text
  💻 laptop  192.168.1.88
@@ -81,6 +81,10 @@ Two rules follow from this, and each one has an error message you'll see constan
 Some ports have conventional owners ([IANA's registry](https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml)): `80` for HTTP, `443` for HTTPS, `5432` for Postgres. `8080` is just a popular choice for development servers, and it's where your Spring app will listen by default.
 
 ## Hands-on
+
+Two small tools that come with macOS:
+- **`nc`** (netcat) can listen on a port and print whatever arrives ([`man nc`](https://man.openbsd.org/nc.1)). `nc -l 8080` means "listen on port 8080".
+- **`curl`** is a client: it connects to an address and makes a request ([Everything curl](https://everything.curl.dev/)).
 
 <Steps>
 

@@ -1,203 +1,165 @@
 ---
-title: '1 · What is a server? (the umpire)'
-description: Why a maths duel needs a referee in the middle, and your first time being a server, by hand, with two terminal windows.
+title: '1 · Why the game needs a server'
+description: Who decides who answered first? The one idea everything else rests on, the source of truth, shown in 25 lines of Kotlin you run yourself.
 sidebar:
-  label: '1 · What is a server?'
+  label: '1 · Why a server?'
   order: 1
 ---
 
-import Stepper from '../../../components/Stepper.astro';
-import Think from '../../../components/Think.astro';
 import Quiz from '../../../components/Quiz.astro';
+import Think from '../../../components/Think.astro';
 import { Aside, Steps } from '@astrojs/starlight/components';
 
-<Aside type="tip" title="Your win today (≈20 min)">
-You'll **be a server yourself**: one terminal waits, another asks it a question, and you type the answer back by hand. You'll see, letter by letter, what a phone actually sends.
+<Aside type="tip" title="Today: 2 bricks · ≈20 min">
+**source of truth** → **client and server**. Win: you'll run a small Kotlin program that shows phones picking the wrong winner, and a server picking the right one, then break it on purpose.
 </Aside>
 
-## The problem: who decides who won?
+## The problem
 
-You and your friend Sita start a duel. The question `7 × 8` appears on both phones. You both type `56`.
+In a maths duel, `7 × 8` appears on your phone and on Sita's. You answer `56` first. Sita answers `56` 0.3 seconds later. **Who decides that you were first?**
 
-**Who was first?** Your phone says "I was first at 10:00:03.2". Sita's phone says "No, *I* was first at 10:00:03.1". Her phone's clock runs a little fast, and phone clocks are never exactly in sync. And what if Sita's cousin edits the app so it always reports "56, in 0.1 seconds"?
+The obvious idea: each phone records *when* its player answered, and the earlier time wins. That fails for two real reasons:
 
-If the phones decide, every phone can say "I won", and nobody can prove otherwise.
+1. **Phone clocks disagree.** A phone's wall clock "can be set by the user or the phone network" ([Android docs: SystemClock](https://developer.android.com/reference/android/os/SystemClock)), so two phones can be seconds apart. If Sita's clock runs 2 seconds slow, her late answer *looks* earlier.
+2. **The app can't be trusted.** The app runs on the player's device. Anyone can modify it to report "answered at time 0" or "my answer was correct". Whatever the phone *says* is a claim, not a fact.
 
-## The real-world fix: an umpire
+## Brick 1 · Source of truth
 
-In cricket, the batter doesn't decide whether they're out, and neither does the bowler. The **umpire** does. Both teams send their appeals to one person in the middle, and that person's decision is final.
+The fix is to let **one program, which the players don't control,** decide everything that matters:
+- it holds **the answer key** (so a phone can't claim a wrong answer was right),
+- it decides **the order** using **its own clock** (so phone clocks don't matter),
+- it keeps **the score**, and phones just display what it says.
 
-The duel needs the same thing: one program, running on a computer neither of you controls, that
+That program is the game's **source of truth**: the one place whose data is correct *by definition*. If a phone and the source of truth disagree, the phone is wrong.
 
-- **hands out** the questions,
-- **receives** every answer,
-- **checks** it against *its own* answer key and *its own* clock,
-- **tells** both phones the score.
+You already work with one. In your banking app, the balance on screen is just a copy. The bank's backend holds the real balance. If the app shows Rs 5,000 and the backend says Rs 3,000, nobody argues: the app is wrong and refreshes. The maths server is the same thing for duels.
 
-That program is a **server**. The phones are **clients**.
+## Brick 2 · Client and server
 
-<Stepper
-  caption="Step through it with the buttons or the ← → keys"
-  steps={[
-    {
-      title: 'Without an umpire: phones decide',
-      art: `  📱 You                         📱 Sita
-  "56 at 10:00:03.2"  ◀──────▶   "56 at 10:00:03.1"
-  "I WON"                        "No, I WON"
-                ¯\\_(ツ)_/¯  nobody can settle it`,
-      note: "Two clocks, two opinions, and nothing stops a modified app from lying.",
-    },
-    {
-      title: 'With an umpire: both phones ask the server',
-      art: `  📱 You                                 📱 Sita
-    │  "my answer: 56"        "my answer: 56"  │
-    └──────────────▶ 🧑‍⚖️ server ◀───────────────┘
-                     (one clock, one answer key)`,
-      note: 'The phones only *send* answers. They never decide anything.',
-    },
-    {
-      title: 'The server decides, then tells everyone',
-      art: `  📱 You                                 📱 Sita
-    ▲  "correct! you 5, Sita 4"   "correct! Sita 4, you 5"  ▲
-    └─────────────── 🧑‍⚖️ server ──────────────────────────────┘
-          arrived first: You (by the SERVER's clock)`,
-      note: "Its clock and its answer key are the only ones that count. This idea has a name you'll use for the rest of the course: the server is the *source of truth*.",
-    },
-  ]}
-/>
+The program that holds the truth is the **server**. The apps that talk to it are **clients**. They have fixed roles:
 
-## Request and response
-
-Every conversation between a client and a server has the same shape. The client **asks** (a **request**), and the server **answers** (a **response**). It's like a counter at a momo shop: you place an order, and the counter hands it back. The counter never shouts out an order nobody placed.
-
-```mermaid
-sequenceDiagram
-    participant P as 📱 Client (your phone)
-    participant S as 🧑‍⚖️ Server (maths)
-    P->>S: request: "give me the next question"
-    S-->>P: response: "7 × 8"
-    P->>S: request: "my answer is 56"
-    S-->>P: response: "correct, score 5"
+```text
+   📱 client (your phone)                        server (holds the truth)
+   ─────────────────────                         ──────────────────────────
+   asks:    "next question?"         ────────▶   decides what it is
+            ◀────────   answers:  "7 × 8"
+   asks:    "my answer is 56"        ────────▶   checks it with ITS key + ITS clock
+            ◀────────   answers:  "correct, you 5 · Sita 4"
 ```
 
-You already know this from Android. When your app calls `api.getBalance()` through Retrofit, the app is the **client** and your bank's backend is the **server**. Until now you've always written the left side of this picture. From today, you write the right side.
+- The client's message is a **request**; the server's reply is a **response**. One request, one response.
+- **The client always speaks first.** This is exactly your Retrofit code: `api.getBalance()` is a request, and the returned value is the response. Until now you've always written the left column. In this project you write the right one.
 
-> 📖 Read alongside: [MDN: Client-Server overview](https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Server-side/First_steps/Client-Server_overview) (15 min). It's the clearest short explanation of request/response, and today's primary source.
+Hold on to one question for later: if the client always speaks first, how does *your* phone find out that *Sita* just scored? (Lesson 22 answers it.)
 
-## Hands-on: be the server
+> 📖 **Primary source:** [MDN: Client-Server overview](https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Server-side/First_steps/Client-Server_overview), first two sections (10 min).
 
-A server is not a special machine. It's just **a program that waits for someone to talk to it**. Let's prove it with two tools already on your Mac:
+## Hands-on: see the difference in Kotlin
 
-- **`nc`** (netcat) is a bare-bones program that waits for a connection and shows whatever arrives ([`man nc`](https://man.openbsd.org/nc.1)).
-- **`curl`** is a client, like a tiny browser for the terminal ([Everything curl](https://everything.curl.dev/)).
+The program below models both designs, with no networking: the phones and the server are just objects. That's enough to see the idea.
+
+```kotlin
+data class Answer(val player: String, val value: Int, val phoneClock: Long)
+
+// Version 1: the phones' own timestamps decide
+fun winnerByPhoneClocks(answers: List<Answer>): String =
+    answers.filter { it.value == 56 }.minBy { it.phoneClock }.player
+
+// Version 2: the server decides, using its own answer key and the order answers reach it
+class Server(private val correctAnswer: Int) {
+    private val arrived = mutableListOf<Answer>()
+
+    fun receive(answer: Answer) {
+        arrived += answer
+    }
+
+    fun winner(): String? = arrived.firstOrNull { it.value == correctAnswer }?.player
+}
+
+fun main() {
+    // What really happened: you answered at 10:00:03.100, Sita at 10:00:03.400.
+    // Sita's phone clock is 2 seconds slow, so her phone stamps 10:00:01.400.
+    val you = Answer("You", 56, phoneClock = 3_100)
+    val sita = Answer("Sita", 56, phoneClock = 1_400)
+
+    println("Phones decide: " + winnerByPhoneClocks(listOf(you, sita)))
+
+    val server = Server(correctAnswer = 56)
+    server.receive(you)  // yours reached the server first
+    server.receive(sita)
+    println("Server decides: " + server.winner())
+}
+```
 
 <Steps>
 
-1. Open **Terminal window A** and start waiting on port `8080` (a port number; lesson 2 explains exactly what that is):
+1. **Predict first.** Before running anything, write down what both lines will print. Committing to a guess is what makes the result stick.
 
-   ```bash
-   nc -l 8080
-   ```
+2. **Run it.** Use whichever is easiest:
+   - paste it into [play.kotlinlang.org](https://play.kotlinlang.org) and press Run, or
+   - in IntelliJ: *File → New → Scratch File → Kotlin*, paste, and run.
 
-   Nothing happens. It's waiting. **Window A is now your server.**
-
-2. Open **Terminal window B** and play the phone asking for a question:
-
-   ```bash
-   curl -v http://localhost:8080/question
-   ```
-
-   `curl` now sits waiting for an answer.
-
-3. Look at **window A**. The request has arrived:
+   I ran it, and it prints:
 
    ```text
-   GET /question HTTP/1.1
-   Host: localhost:8080
-   User-Agent: curl/8.7.1
-   Accept: */*
+   Phones decide: Sita
+   Server decides: You
    ```
 
-   That's what every phone sends to every server on the web. It's just text.
+   The phones crowned the wrong player. Nobody cheated; one clock was simply off.
 
-4. Now **you are the server**. In window A, type this response by hand, pressing Enter after each line (including the empty line in the middle):
+3. **Now cheat.** Pretend Sita's app is modified: change her `phoneClock` to `0` and run it again. Version 1 now gives Sita every round she plays, whatever really happened. Version 2 still says `You`, because the server never reads `phoneClock` at all.
 
-   ```text
-   HTTP/1.1 200 OK
-
-   7 x 8 = ?
-   ```
-
-   Then press **Ctrl+C** in window A to close the connection.
-
-5. Look at **window B**. `curl` printed **`7 x 8 = ?`**. Your hand-typed answer travelled to the client. 🎉
+4. **Cheat differently.** Change Sita's `value` to `65` (wrong) and imagine her modified app *claims* it was correct. Which version could be fooled by a claim like that, and why can't the server be?
 
 </Steps>
 
-```text
-  window B (client: curl)                   window A (server: you + nc)
-  ──────────────────────                    ───────────────────────────
-  GET /question HTTP/1.1      ───────▶      you read this
-  Host: localhost:8080
-                              ◀───────      you typed:  HTTP/1.1 200 OK
-  prints: 7 x 8 = ?                                      (empty line)
-                                                         7 x 8 = ?
-```
-
-<Aside type="note" title="Notice what you just did">
-You were a slow, human server. The real `maths` server will do exactly what you did, just in microseconds: **wait → read the request → decide → write the response**. Everything else we build is a better version of those four steps.
+<Aside type="note" title="Two simplifications, both fixed later">
+The server here uses *arrival order*; the real one will stamp answers with its own clock (lesson 17). And `receive()` is called directly; in the real game the answer has to travel from the phone to the server over a network. That's lessons 2–6.
 </Aside>
-
-We'll take the request and response apart line by line in the next lesson (that's HTTP). For now, spot three things:
-- the first line names **what** the client wants: `GET /question`;
-- the client says who it is: `User-Agent: curl/...`;
-- your reply started with **`200 OK`**, which told the client "here's what you asked for".
 
 ## Check yourself
 
 <Quiz
-  question="In a maths duel, who should decide which player answered first?"
+  question="Your app shows a score of 5. The server says 4. Which one is correct?"
   options={[
-    'The faster phone using its clock',
-    'The server using its own clock',
-    'Both phones comparing their two clocks',
-  ]}
-  answer={1}
->
-Phone clocks drift, and a modified app can lie. Only one clock can be the referee, and that's the server's.
-</Quiz>
-
-<Quiz
-  question="In today's exercise, which window was the server?"
-  options={[
-    'Window B, the one running curl',
-    'Window A, the one running nc',
-    'Neither window, servers are special machines',
-  ]}
-  answer={1}
->
-A server is a *program that waits*. `nc -l 8080` waited and you answered. Your laptop was both client and server at the same time.
-</Quiz>
-
-<Quiz
-  question="Your Android app calls api.getBalance() through Retrofit. What is the app?"
-  options={[
-    'The server that answers the call',
-    'The umpire that holds the truth',
-    'The client that sends a request',
+    'The app, it saw your answers',
+    'Neither, the two must agree first',
+    'The server, it is the truth',
   ]}
   answer={2}
 >
-The app asks, so it's the client. The bank's backend holds the real balance, so it's the server (the source of truth).
+The server is the source of truth, so its 4 is correct *by definition*. The app's 5 is a stale or wrong copy, and the app should replace it with the server's value.
 </Quiz>
 
-<Think id="maths-l1-teachback" prompt="Teach-back: explain to a friend who doesn't code why the maths game can't just let the two phones decide who won. Use the umpire idea, in 2–4 sentences." revealLabel="Compare with a model answer">
-*Model answer:* Each phone has its own clock, and the clocks never agree exactly, so both could honestly claim to be first. Someone could also edit the app to lie about their answers. So both phones send their answers to one server, like appeals to an umpire. It checks them with its own clock and answer key, and everyone accepts its decision.
+<Quiz
+  question="Why does Version 2 ignore the phoneClock field completely?"
+  options={[
+    'Phones cannot be trusted for it',
+    'Reading clocks is far too slow',
+    'Kotlin cannot compare two Long values',
+  ]}
+  answer={0}
+>
+Any value a phone sends is a claim that can be wrong (a drifting clock) or forged (a modified app). The server only trusts what it can check itself.
+</Quiz>
+
+<Quiz
+  question="Which side sends the first message in every exchange?"
+  options={[
+    'The server, to start the game',
+    'The client, sending a request first',
+    'Whichever side has news to share',
+  ]}
+  answer={1}
+>
+The client asks, and the server answers. That's the request → response pattern, the same as every Retrofit call you've written.
+</Quiz>
+
+## Your turn (reply in the chat)
+
+<Think id="maths-l1-teachback-v2" prompt="In 3–4 sentences, explain to another Android developer why the duel's winner must be decided on the server, using the two failure reasons from this lesson. Then list three things the maths server must own (not the phone)." revealLabel="Compare with a model answer">
+*Model answer:* Phone clocks can be set by the user or the network, so timestamps from two phones can't be compared fairly. And the app runs on the player's device, so anything it reports can be forged. So a server, which no player controls, is the source of truth: it checks answers with its own key and orders them by its own clock. Things it must own: **the answer key (the questions' answers)**, **the order/time of answers**, and **the score**.
 </Think>
 
-## Before the next lesson
-- **Do the exercise for real**, and paste what window A printed into our chat.
-- Tell me one thing that surprised you, and one thing that's still fuzzy.
-- 🙋 **Stuck or curious about anything?** Ask me in the chat. "What does `-v` do?", "why port 8080?" and "what if two curls connect at once?" are all great questions.
-
-**Next:** [Lesson 2: processes, IP addresses, ports](../0002-processes-ips-ports/). What `nc -l 8080` was actually doing.
+**Next:** [Lesson 2: processes, IP addresses, ports](../0002-processes-ips-ports/). Before the answer can travel from your phone to the server, it needs an address.
