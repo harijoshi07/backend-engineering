@@ -1,0 +1,214 @@
+---
+title: '2 · Processes, IP addresses, ports'
+description: What nc was actually doing in lesson 1. Three bricks, and every one of them shows up in an address like 192.168.1.88:8080.
+sidebar:
+  label: '2 · Processes, IPs, ports'
+  order: 2
+---
+
+import Quiz from '../../../components/Quiz.astro';
+import Think from '../../../components/Think.astro';
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+<Aside type="tip" title="Today: 3 bricks · ≈25 min">
+**process** → **IP address** → **port**. Win: you'll find which program is sitting on a port, cause the two classic errors on purpose, and fix them.
+</Aside>
+
+## Recall (from memory)
+1. In lesson 1, which terminal window was the server?
+2. Why must the server, not the phones, decide who answered first?
+
+## The example we'll take apart
+
+In your Wordle app, to play on a real phone you typed the laptop's address into the server dialog. Something like:
+
+```text
+http://192.168.1.88:8080
+       └────┬─────┘ └┬─┘
+        IP address   port
+```
+
+The **IP address** picks *which machine*. The **port** picks *which program on that machine*. Both only make sense once you know what a running program is, so we start there.
+
+## Brick 1 · Process
+
+A **program** is a file on disk, e.g. `/usr/bin/nc`. A **process** is that program **while it's running**. The operating system (macOS here) loads it into memory, gives it a number called a **PID** (process ID), and lets it run.
+
+You've seen this already. Logcat has a PID column, and every Android app runs as its own process. When Android kills your app in the background, that's the process ending ([Android docs: Logcat](https://developer.android.com/studio/debug/logcat)).
+
+Two facts about processes that we'll build on:
+- **One program can run as many processes.** Open two terminals and run `nc` in both: same file, two processes, two PIDs.
+- **A process can sit and wait.** `nc -l 8080` used almost no CPU. It was *blocked*, asleep until something arrived. A server spends most of its life like that.
+
+> Source: *Operating Systems: Three Easy Pieces*, ch. 4 ["The Abstraction: The Process"](https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-intro.pdf) (free; the first 3 pages are enough today).
+
+## Brick 2 · IP address
+
+An **IP address** is the number that identifies a machine on a network, like `192.168.1.88` ([MDN: IP address](https://developer.mozilla.org/en-US/docs/Glossary/IP_Address)). When your phone sends something to `192.168.1.88`, the Wi-Fi router delivers it to the laptop with that address.
+
+One address is special: **`127.0.0.1`**, also called **`localhost`**, always means **"this same machine"**. Anything sent there never leaves the computer. That's why lesson 1 worked without any network: `curl` and `nc` were on the same Mac.
+
+```text
+  📱 phone ── "192.168.1.88" ──▶ Wi-Fi router ──▶ 💻 laptop (192.168.1.88)
+  💻 laptop ── "127.0.0.1" ──▶ 💻 the same laptop (never leaves it)
+```
+
+So the phone uses the laptop's **network address**, and the laptop talks to itself with **localhost**.
+
+## Brick 3 · Port
+
+A laptop runs hundreds of processes. When bytes arrive at `192.168.1.88`, which process gets them? The **port** decides. It's a number from 0 to 65535 ([MDN: Port](https://developer.mozilla.org/en-US/docs/Glossary/Port)).
+
+A process **listens** on a port. That means it tells the OS "anything arriving for port 8080, hand it to me". That is exactly what `nc -l 8080` did: `-l` stands for *listen*.
+
+```text
+ 💻 laptop  192.168.1.88
+ ┌────────────────────────────────────────────────────────┐
+ │  port 8080  ◀── listened on by ──  nc        (PID 71853) │
+ │  port 8000  ◀── listened on by ──  python3   (PID 73771) │
+ │  port 9999  ◀── nobody                                   │
+ └────────────────────────────────────────────────────────┘
+   "192.168.1.88:8080"  =  this machine, that process
+```
+
+Two rules follow from this, and each one has an error message you'll see constantly as a backend engineer:
+
+| Situation | What you see |
+|---|---|
+| **Nobody listens** on that port and a client tries to connect (opens a conversation with it; lesson 3 shows what that really is) | the connection is **refused**: `curl: (7) Failed to connect … Couldn't connect to server` |
+| **Two programs try to listen** on the same port | the second one fails: `Address already in use` |
+
+Some ports have conventional owners ([IANA's registry](https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml)): `80` for HTTP, `443` for HTTPS, `5432` for Postgres. `8080` is just a popular choice for development servers, and it's where your Spring app will listen by default.
+
+## Hands-on
+
+<Steps>
+
+1. **Start a listener and find its process.** Window A:
+
+   ```bash
+   nc -l 8080
+   ```
+
+   Window B: ask the OS "who is listening on 8080?"
+
+   ```bash
+   lsof -nP -iTCP:8080 -sTCP:LISTEN
+   ```
+
+   On my Mac it printed:
+
+   ```text
+   COMMAND   PID USER   FD   TYPE  ...  NODE NAME
+   nc      71853  mac    3u  IPv4  ...   TCP *:8080 (LISTEN)
+   ```
+
+   There's the process (`nc`), its PID, and the port it's listening on.
+
+2. **Stop it by its PID.** In window B (use *your* PID):
+
+   ```bash
+   kill 71853
+   ```
+
+   Window A's `nc` ends. Run the `lsof` command again: it prints nothing, so nobody is listening any more.
+
+3. **Error 1: nobody listening.**
+
+   ```bash
+   curl http://localhost:8080/question
+   ```
+
+   ```text
+   curl: (7) Failed to connect to localhost port 8080 after 0 ms: Couldn't connect to server
+   ```
+
+   The machine is there, but no process is at that port.
+
+4. **Error 2: the port is taken.** For this one we use another listening program, a tiny web server built into Python. (macOS's `nc` bends this rule, so it can't show it.) Window A:
+
+   ```bash
+   python3 -m http.server 8080
+   ```
+
+   Window B, try to start a second one on the same port:
+
+   ```bash
+   python3 -m http.server 8080
+   ```
+
+   ```text
+   OSError: [Errno 48] Address already in use
+   ```
+
+   Stop window A with Ctrl+C, and try window B's command again. It works now.
+
+5. **Find your laptop's network address**, the one a phone would use:
+
+   ```bash
+   ipconfig getifaddr en0
+   ```
+
+   Mine prints `192.168.1.88`. Yours will differ.
+
+</Steps>
+
+<Aside type="note" title="The thing to remember">
+`IP:port` names **one listening process on one machine**. Refused means no process is at that port. Address already in use means some process already is.
+</Aside>
+
+## Check yourself
+
+<Quiz
+  question="curl says Couldn't connect to server for localhost:8080. Most likely cause?"
+  options={[
+    'Your laptop\'s Wi-Fi is turned off',
+    'Nothing is listening on port 8080',
+    'The server sent back an error',
+  ]}
+  answer={1}
+>
+`localhost` never leaves the machine, so Wi-Fi isn't involved. And the server can't send an error if you never reached it. Nobody is at that port.
+</Quiz>
+
+<Quiz
+  question="Your phone must reach the server on your laptop. Which address should it use?"
+  options={[
+    'The laptop address, 192.168.1.88:8080',
+    'The localhost address, 127.0.0.1:8080',
+    'Any address, router picks',
+  ]}
+  answer={0}
+>
+On the phone, `127.0.0.1` means *the phone itself*. It has to use the laptop's network address.
+</Quiz>
+
+<Quiz
+  question="You start your Spring app and get Address already in use. What happened?"
+  options={[
+    'The app code has a bug',
+    'The laptop ran out of ports',
+    'Another process already holds that port',
+  ]}
+  answer={2}
+>
+Usually an old copy of your own server is still running. Find it with `lsof -nP -iTCP:8080 -sTCP:LISTEN` and `kill` its PID.
+</Quiz>
+
+## Your turn (reply in the chat)
+
+<Think id="maths-l2-ports" prompt="Your friend opens maths on their phone and gets &quot;can't connect&quot;. Using only today's three bricks, list three different reasons it could be, and the command you'd run on the laptop to check each one." revealLabel="Compare with a model answer">
+1. **The server process isn't running.** Check with `lsof -nP -iTCP:8080 -sTCP:LISTEN`; empty output means start it.
+2. **Wrong IP.** The phone has an old or wrong address. Check with `ipconfig getifaddr en0`, since the laptop's address can change when it rejoins the Wi-Fi.
+3. **Wrong port.** The server is listening on a different port than the app uses. Same `lsof` command, without `:8080`: `lsof -nP -iTCP -sTCP:LISTEN`.
+
+(There's a fourth reason, the server listening only on `127.0.0.1`. That brick comes in lesson 29.)
+</Think>
+
+## Read alongside
+- 📖 **Primary:** [Beej's Guide to Network Programming](https://beej.us/guide/bgnet/html/), chapter "IP Addresses, structs, and Data Munging": read only the parts ["IP Addresses, versions 4 and 6"](https://beej.us/guide/bgnet/html/#ip-addresses-versions-4-and-6) and ["Port Numbers"](https://beej.us/guide/bgnet/html/#port-numbers). A classic, written for beginners.
+- [OSTEP ch. 4: The Process](https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-intro.pdf), first 3 pages.
+
+🙋 Anything fuzzy? Ask me. Good ones: "what's the `-nP` in lsof?", "why 65535?", "what's that `IPv6` in lsof's output?"
+
+**Next:** Lesson 3: a connection is a pipe of bytes. What actually travels between `curl` and `nc`.

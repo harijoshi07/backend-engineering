@@ -5,3 +5,5 @@ Hari writes Kotlin daily as an Android engineer (~1.5–2 years, mobile banking)
 **Evidence**: their own statement (2026-11-13), and the wordle repo review (2026-11-12).
 
 **Implications**: lessons can use Kotlin freely. Never assume they know server-side ideas just because they appear in wordle; check with retrieval questions first.
+
+**Update 2026-11-13**: assume zero backend foundations (processes, IP, ports, connections, HTTP structure) even though Wordle used them; the knowledge map starts there.
