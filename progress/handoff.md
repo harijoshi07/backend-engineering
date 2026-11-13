@@ -43,7 +43,7 @@ Every question in a lesson is a `Think` box. Answers sync to the learner's **sec
 - Both modes are **duels**, in-memory, Kotlin + Spring Boot (JDK 25):
   - **Live Duel**: same questions, same order, 60 seconds, most correct answers wins, opponent's score shown live.
   - **Cross Math Duel**: same grid of equations, first correct solve wins.
-- The code will live in a separate **private** repo the learner creates (planned name: `maths`). It doesn't exist yet.
+- The code lives in the learner's **private** repo `harijoshi07/maths`, cloned at `~/code/personal/maths` on the work Mac. `handmade/Server.kt` (lessons 7–9) holds the L7 skeleton; the learner fills it in. Don't write their server code for them.
 
 ## Site
 - Astro 7 + Starlight 0.42, in `site/`.

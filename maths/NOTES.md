@@ -22,4 +22,4 @@
 
 ## Working notes
 - **Learner's answers live in their secret gist "backend-engineering answers"** (one `<think-id>.md` per question; find it with `gh gist list | grep 'backend-engineering answers'`, read with `gh gist view <id> -f <think-id>.md`). The site's `Think` boxes sync there; answers given in chat get written there too (`gh api -X PATCH gists/<id>`). Always fetch from the gist before grading. Never put the gist id in this public repo.
-- Code for the game lives in a separate repo they create themselves (planned: `harijoshi07/maths`, private).
+- Code for the game lives in their private repo `harijoshi07/maths` (`~/code/personal/maths`); lessons 7–9 in `handmade/`.
