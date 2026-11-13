@@ -1,0 +1,61 @@
+---
+title: 'Maths: build a duel game from zero'
+description: A two-player maths duel server in Kotlin + Spring Boot, built by hand from absolute basics, one small lesson at a time.
+sidebar:
+  label: Start here
+  order: 0
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+<Aside type="tip" title="The mission">
+Build **maths**, a game where two friends race each other at maths on their phones, **by your own hand**, starting from "what is a server?". By the end you'll be able to draw how it works, rebuild its core without looking, and beat your friends at it.
+</Aside>
+
+## The game
+
+<CardGrid>
+  <Card title="Live Duel" icon="rocket">
+    Two players get the **same questions in the same order** (`7 × 8`, `63 ÷ 9`, …). You have **60 seconds**, and the most correct answers wins. You can watch your opponent's score climb live.
+  </Card>
+  <Card title="Cross Math Duel" icon="puzzle">
+    Both players get the **same grid**, where every row and column is an equation with blanks. The **first correct solve** wins.
+  </Card>
+</CardGrid>
+
+```text
+ ┌──────────────┐                        ┌──────────────┐
+ │ phone: You   │                        │ phone: Sita  │
+ │  7 × 8 = ▢   │                        │  7 × 8 = ▢   │
+ │  you:  4     │                        │  you:  3     │
+ │  them: 3     │                        │  them: 4     │
+ └──────┬───────┘                        └───────┬──────┘
+        │                                        │
+        │         ┌──────────────────────┐       │
+        └────────▶│     maths server     │◀──────┘
+                  │  (the umpire: you    │
+                  │     build this)      │
+                  └──────────────────────┘
+```
+
+## How the lessons work
+- **Short.** Each lesson takes 15–30 minutes and ends with **one tangible win**: something you ran, built or drew yourself.
+- **Knowledge first, then practice.** A small piece of theory, then you *do* it, with quick feedback from quizzes, your terminal, and me.
+- **Absolute basics.** No step is too small. If something is unclear, **ask me in the chat**. That's what I'm here for.
+- **Recall before new material.** Each lesson opens with questions on the previous ones, answered from memory. Struggling a bit is the point: that's what makes it stick.
+- **You write the server code.** I explain, ask, and review; I don't write it for you. The phone app can be AI-built later.
+- **Every claim links to a trusted source**, so you don't have to take my word for it.
+
+## The road (rough; it will adjust to how you're doing)
+
+| Part | You'll learn | You'll have |
+|---|---|---|
+| **1 · Foundations** | what a server is, HTTP by hand, ports, what Spring Boot does for you | a Spring Boot app answering `curl` |
+| **2 · The duel** | modelling the game, seeded questions, JSON, endpoints, errors | a duel playable with `curl` |
+| **3 · Two players at once** | threads, race conditions, locks, the server's clock, safe retries | a duel that's fair under pressure |
+| **4 · Live** | polling vs WebSocket, push, disconnects, heartbeats | opponent's score updating live |
+| **5 · Cross Math** | grid model, generating puzzles, checking solutions | the second duel mode |
+| **6 · Play** | wiring the (AI-built) app to *your* server | a real duel on two phones 🎮 |
+
+## Lessons
+1. [What is a server? (the umpire)](./0001-what-is-a-server/)

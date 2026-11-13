@@ -65,6 +65,7 @@ export default defineConfig({
             { label: 'The flagship: a digital wallet', slug: 'start/flagship' },
           ],
         },
+        { label: 'Maths: build a duel game', items: [{ autogenerate: { directory: 'maths' } }] },
         { label: 'Roadmap (100 sessions)', slug: 'roadmap' },
         { label: 'My progress', slug: 'progress' },
         { label: 'Sessions', items: [{ autogenerate: { directory: 'sessions' } }] },
