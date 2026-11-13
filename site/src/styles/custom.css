@@ -172,3 +172,47 @@ pre.mermaid:not([data-processed]) { color: transparent; min-height: 4rem; }
 
 .sl-markdown-content :is(th, td):first-child { padding-inline-start: 0.9rem; }
 .sl-markdown-content :is(th, td):last-child { padding-inline-end: 0.9rem; }
+
+/* ── Inline "On this page" (replaces the right sidebar) ─────── */
+.be-toc {
+  margin-top: 1.25rem;
+  background: var(--be-surface);
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 12px;
+  padding: 0.7rem 1rem;
+  font-size: 0.92rem;
+}
+.be-toc summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--sl-color-white);
+  list-style-position: outside;
+}
+.be-toc ol { margin: 0.5rem 0 0.2rem; padding-inline-start: 1.2rem; }
+.be-toc li { margin: 0.2rem 0; }
+.be-toc li.d3 { margin-inline-start: 1.1rem; list-style: circle; font-size: 0.88rem; }
+.be-toc a { color: var(--sl-color-gray-2); text-decoration: none; }
+.be-toc a:hover { color: var(--sl-color-accent); text-decoration: underline; }
+
+/* ── Collapsible left sidebar (desktop) ──────────────────────── */
+.be-sidebar-toggle { display: none; }
+@media (min-width: 50rem) {
+  .be-sidebar-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.75rem;
+    padding: 0.3rem 0.65rem;
+    font: inherit;
+    font-size: 0.82rem;
+    color: var(--sl-color-gray-2);
+    background: transparent;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .be-sidebar-toggle:hover { color: var(--sl-color-accent); border-color: var(--sl-color-accent); }
+  :root[data-sidebar='collapsed'] .sidebar-pane { display: none; }
+  :root[data-sidebar='collapsed'] .main-frame { padding-inline-start: 0; }
+  :root[data-sidebar='collapsed'] .main-pane { margin-inline: auto; }
+}

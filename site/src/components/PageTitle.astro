@@ -1,0 +1,57 @@
+---
+// Overrides Starlight's PageTitle: the title, then a collapsible, clickable
+// "On this page" list built from the page's h2/h3 headings (replaces the right sidebar),
+// plus the button that collapses the left sidebar on desktop.
+import Default from '@astrojs/starlight/components/PageTitle.astro';
+
+const { headings, hasSidebar } = Astro.locals.starlightRoute;
+const items = headings.filter((h) => h.depth === 2 || h.depth === 3);
+---
+
+<Default />
+
+{hasSidebar && (
+  <button type="button" class="be-sidebar-toggle" aria-controls="starlight__sidebar" title="Toggle sidebar ( [ )">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" />
+    </svg>
+    <span class="label">Hide sidebar</span>
+  </button>
+)}
+
+{items.length > 0 && (
+  <details class="be-toc" open>
+    <summary>On this page</summary>
+    <ol>
+      {items.map((h) => (
+        <li class={`d${h.depth}`}><a href={`#${h.slug}`}>{h.text}</a></li>
+      ))}
+    </ol>
+  </details>
+)}
+
+<script>
+  const KEY = 'be-sidebar';
+  const root = document.documentElement;
+  const sync = () => {
+    const collapsed = root.dataset.sidebar === 'collapsed';
+    document.querySelectorAll<HTMLButtonElement>('.be-sidebar-toggle').forEach((b) => {
+      b.setAttribute('aria-expanded', String(!collapsed));
+      const label = b.querySelector('.label');
+      if (label) label.textContent = collapsed ? 'Show sidebar' : 'Hide sidebar';
+    });
+  };
+  const toggle = () => {
+    const collapsed = root.dataset.sidebar !== 'collapsed';
+    if (collapsed) root.dataset.sidebar = 'collapsed';
+    else delete root.dataset.sidebar;
+    try { localStorage.setItem(KEY, collapsed ? 'collapsed' : 'open'); } catch {}
+    sync();
+  };
+  document.querySelectorAll('.be-sidebar-toggle').forEach((b) => b.addEventListener('click', toggle));
+  document.addEventListener('keydown', (e) => {
+    const t = e.target as HTMLElement;
+    if (e.key === '[' && !e.metaKey && !e.ctrlKey && !t.closest('input, textarea, [contenteditable]')) toggle();
+  });
+  sync();
+</script>

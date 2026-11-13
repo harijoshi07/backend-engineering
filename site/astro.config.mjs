@@ -54,7 +54,18 @@ export default defineConfig({
           frames: { editorBackground: 'var(--be-code-bg)', terminalBackground: 'var(--be-code-bg)' },
         },
       },
-      head: [{ tag: 'script', attrs: { type: 'module' }, content: mermaidScript }],
+      head: [
+        // Apply the remembered sidebar state before first paint (no flash).
+        {
+          tag: 'script',
+          content:
+            "try{if(localStorage.getItem('be-sidebar')==='collapsed')document.documentElement.dataset.sidebar='collapsed'}catch(e){}",
+        },
+        { tag: 'script', attrs: { type: 'module' }, content: mermaidScript },
+      ],
+      // No right-hand sidebar: an inline "On this page" list sits under each title instead.
+      tableOfContents: false,
+      components: { PageTitle: './src/components/PageTitle.astro' },
       lastUpdated: true,
       sidebar: [
         {
