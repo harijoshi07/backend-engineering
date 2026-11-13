@@ -12,3 +12,5 @@ A 100-session, Socratic backend engineering course in **Kotlin + Spring Boot**, 
 | `progress/` | Mentor's session log and the spaced-repetition weak-spots queue |
 | `labs/` | First-principles labs: TCP echo, NanoHTTP, KV store, raw ledger, mini DI |
 | `adr/`, `blog/` | Architecture decisions and blog drafts |
+
+> New session? Read [`progress/handoff.md`](progress/handoff.md) first.
