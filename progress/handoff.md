@@ -24,6 +24,9 @@ This repo is a self-taught backend course: a public GitHub Pages site plus a tea
 - **Next to write:** Lesson 3, "A connection is a pipe of bytes" (concepts B2 bytes & text, N3 connection, N4 client/server precisely). Grade the replies first, and write learning records only when the learner shows real understanding.
 - `maths/drafts/http-byte-by-byte.mdx` is an over-packed HTTP draft. Split it into Lessons 4–6 once their prerequisites are taught.
 
+## Where the learner's answers are
+Every question in a lesson is a `Think` box. Answers sync to the learner's **secret gist "backend-engineering answers"** (`<think-id>.md`), from the site on any device once they've pasted a gist-scoped token, and from chat (Claude writes them there). Fetch from the gist before grading: `gh gist list | grep 'backend-engineering answers'`.
+
 ## Hard rules for teaching (from the learner)
 1. **Brick by brick.** Never use a concept before the lesson that teaches it. Allowed givens: Kotlin, Android apps, JSON data classes, Retrofit usage. Check every lesson against `map.mdx`.
 2. **Real substance, few analogies.** Use at most ONE familiar example per lesson, ideally from their Android/Wordle world. Run every command and show its true output.

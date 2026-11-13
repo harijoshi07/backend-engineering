@@ -95,6 +95,8 @@ fun main() {
 
 1. **Predict first.** Before running anything, write down what both lines will print. Committing to a guess is what makes the result stick.
 
+   <Think id="maths-l1-predict" prompt="What will the two lines print?" />
+
 2. **Run it.** Use whichever is easiest:
    - paste it into [play.kotlinlang.org](https://play.kotlinlang.org) and press Run, or
    - in IntelliJ: *File → New → Scratch File → Kotlin*, paste, and run.
@@ -111,6 +113,10 @@ fun main() {
 3. **Now cheat.** Pretend Sita's app is modified: change her `phoneClock` to `0` and run it again. Version 1 now gives Sita every round she plays, whatever really happened. Version 2 still says `You`, because the server never reads `phoneClock` at all.
 
 4. **Cheat differently.** Change Sita's `value` to `65` (wrong) and imagine her modified app *claims* it was correct. Which version could be fooled by a claim like that, and why can't the server be?
+
+   <Think id="maths-l1-cheat" prompt="Which version is fooled by the claim, and why can't the server be?" revealLabel="Check">
+   Version 1, if it believed the phone's claim. The server never takes the phone's word for correctness: it compares `value` against its own `correctAnswer`, so `65` simply doesn't count.
+   </Think>
 
 </Steps>
 

@@ -15,8 +15,13 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 </Aside>
 
 ## Recall (from memory)
-1. Give the two reasons the phones can't decide who answered first.
-2. In a Retrofit call, which side is the client, and which message comes first?
+<Think id="maths-l2-recall-1" prompt="Give the two reasons the phones can't decide who answered first." revealLabel="Check">
+Phone clocks disagree (the user or the network can set them), and the app can't be trusted: it runs on the player's device, so anything it reports can be forged.
+</Think>
+
+<Think id="maths-l2-recall-2" prompt="In a Retrofit call, which side is the client, and which message comes first?" revealLabel="Check">
+Your app is the client, and its request comes first. The server only ever replies with a response.
+</Think>
 
 ## The example we'll take apart
 

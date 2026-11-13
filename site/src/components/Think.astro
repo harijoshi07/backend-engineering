@@ -1,28 +1,116 @@
 ---
 // Socratic "think first" box: you must write an answer before you can reveal.
-// Your answer is saved in this browser (localStorage) so you can compare later.
+// Your answer is saved in this browser (localStorage) and, once you connect a GitHub token,
+// synced to your secret gist "backend-engineering answers" as <id>.md, so it follows you
+// across devices and your teacher (Claude, in chat) can read it.
 interface Props { id: string; prompt: string; revealLabel?: string }
 const { id, prompt, revealLabel = 'Reveal' } = Astro.props;
+const hasAnswer = Astro.slots.has('default');
 ---
 <be-think data-id={id} class="not-content">
   <p class="prompt">🤔 {prompt}</p>
   <textarea rows="3" placeholder="Write your answer first, in your own words…"></textarea>
-  <button type="button" disabled>{revealLabel}</button>
-  <div class="answer" hidden><slot /></div>
+  <div class="row">
+    {hasAnswer && <button type="button" class="reveal" disabled>{revealLabel}</button>}
+    <span class="status"></span>
+    <button type="button" class="connect" hidden>Sync across devices</button>
+  </div>
+  {hasAnswer && <div class="answer" hidden><slot /></div>}
 </be-think>
 
 <script>
+  const DESC = 'backend-engineering answers';
+  const TOKEN_KEY = 'be-answers:token';
+
+  type Gist = { id: string; files: Record<string, string> };
+  let gist: Promise<Gist | null> | null = null;
+
+  const token = () => { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } };
+
+  async function gh(path: string, init: RequestInit = {}) {
+    const res = await fetch(`https://api.github.com${path}`, {
+      ...init,
+      headers: { Authorization: `Bearer ${token()}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) throw new Error(`GitHub ${res.status}`);
+    return res.json();
+  }
+
+  // One fetch per page, shared by every box on it.
+  function loadGist(): Promise<Gist | null> {
+    if (!token()) return Promise.resolve(null);
+    gist ??= (async () => {
+      const list: { id: string; description: string }[] = await gh('/gists?per_page=100');
+      const hit = list.find((g) => g.description === DESC);
+      if (!hit) throw new Error(`no gist named "${DESC}"`);
+      const full = await gh(`/gists/${hit.id}`);
+      const files: Record<string, string> = {};
+      for (const [name, f] of Object.entries<{ content: string }>(full.files)) files[name] = f.content;
+      return { id: hit.id, files };
+    })().catch((e) => { gist = null; throw e; });
+    return gist;
+  }
+
   class Think extends HTMLElement {
     connectedCallback() {
-      const key = `be-think:${location.pathname}:${this.dataset.id}`;
+      const id = this.dataset.id!;
+      const key = `be-think:${location.pathname}:${id}`;
+      const file = `${id}.md`;
       const ta = this.querySelector('textarea')!;
-      const btn = this.querySelector('button')!;
-      const ans = this.querySelector('.answer') as HTMLElement;
+      const reveal = this.querySelector<HTMLButtonElement>('.reveal');
+      const ans = this.querySelector<HTMLElement>('.answer');
+      const status = this.querySelector<HTMLElement>('.status')!;
+      const connect = this.querySelector<HTMLButtonElement>('.connect')!;
+
+      const say = (text: string) => { status.textContent = text; };
+      const sync = () => { if (reveal) reveal.disabled = ta.value.trim().length < 10; };
+      const saveLocal = () => { try { localStorage.setItem(key, ta.value); } catch {} };
+
+      let timer: number | undefined;
+      const push = async () => {
+        const text = ta.value.trim();
+        if (!text) return;
+        try {
+          const g = await loadGist();
+          if (!g) return;
+          say('Saving…');
+          await gh(`/gists/${g.id}`, { method: 'PATCH', body: JSON.stringify({ files: { [file]: { content: text } } }) });
+          g.files[file] = text;
+          say('Saved ✓ synced');
+        } catch (e) {
+          say(`Not synced (${(e as Error).message}). Saved in this browser.`);
+        }
+      };
+
       try { ta.value = localStorage.getItem(key) ?? ''; } catch {}
-      const sync = () => { btn.disabled = ta.value.trim().length < 10; };
-      ta.addEventListener('input', () => { try { localStorage.setItem(key, ta.value); } catch {} sync(); });
-      btn.addEventListener('click', () => { ans.hidden = false; btn.hidden = true; });
       sync();
+
+      if (!token()) {
+        say('Saved in this browser only.');
+        connect.hidden = false;
+      } else {
+        say('Loading…');
+        loadGist().then((g) => {
+          if (!g) return;
+          const remote = g.files[file];
+          if (remote !== undefined) { ta.value = remote; saveLocal(); sync(); say('Saved ✓ synced'); }
+          else if (ta.value.trim()) push(); // an answer written before sync was connected
+          else say('Synced. Nothing written yet.');
+        }).catch((e) => say(`Can't reach your gist (${(e as Error).message}). Saved in this browser.`));
+      }
+
+      ta.addEventListener('input', () => {
+        saveLocal();
+        sync();
+        if (token()) { say('Typing…'); clearTimeout(timer); timer = window.setTimeout(push, 1200); }
+      });
+      reveal?.addEventListener('click', () => { if (ans) ans.hidden = false; reveal.hidden = true; });
+      connect.addEventListener('click', () => {
+        const t = prompt('Paste a GitHub fine-grained token with "Gists: Read and write" access. It stays in this browser.');
+        if (!t?.trim()) return;
+        try { localStorage.setItem(TOKEN_KEY, t.trim()); } catch {}
+        location.reload();
+      });
     }
   }
   customElements.define('be-think', Think);
@@ -32,7 +120,10 @@ const { id, prompt, revealLabel = 'Reveal' } = Astro.props;
   be-think { display: block; border: 1px solid var(--sl-color-accent); border-radius: 10px; padding: 1rem 1.1rem; margin: 1.5rem 0; background: color-mix(in srgb, var(--sl-color-accent) 5%, transparent); }
   .prompt { font-weight: 600; margin: 0 0 .6rem; }
   textarea { width: 100%; box-sizing: border-box; font: inherit; padding: .6rem; border-radius: 8px; border: 1px solid var(--sl-color-gray-5); background: var(--sl-color-bg); color: var(--sl-color-text); resize: vertical; }
-  button { margin-top: .5rem; font: inherit; padding: .4rem .9rem; border-radius: 8px; border: 0; background: var(--sl-color-accent); color: var(--sl-color-black); cursor: pointer; font-weight: 600; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .8rem; margin-top: .5rem; }
+  button { font: inherit; padding: .4rem .9rem; border-radius: 8px; border: 0; background: var(--sl-color-accent); color: var(--sl-color-black); cursor: pointer; font-weight: 600; }
   button:disabled { opacity: .45; cursor: not-allowed; }
+  .connect { background: transparent; color: var(--sl-color-accent); border: 1px solid var(--sl-color-accent); padding: .25rem .7rem; font-size: var(--sl-text-sm); }
+  .status { font-size: var(--sl-text-sm); color: var(--sl-color-gray-3); }
   .answer { margin-top: .8rem; padding-top: .8rem; border-top: 1px dashed var(--sl-color-gray-5); }
 </style>
