@@ -80,11 +80,15 @@ fun InputStream.readHttpLine(): String {
 
 **Where:** your private repo `maths` (`~/code/personal/maths`). The skeleton below is already in `handmade/Server.kt`, with the `readHttpLine` helper pasted in. (The Spring version comes in lesson 10, in the same repo.)
 
-**Run it** from `handmade/`. It takes about 10 seconds to compile:
+**Edit it in IntelliJ:** open the `maths` folder and let it load the Gradle project. That gives you hover docs, autocomplete and red underlines. (Gradle is the build tool. Lesson 10 explains what those files do. For now they just make the IDE and the run command work.)
+
+**Run it** from the repo root, in IntelliJ's terminal:
 
 ```bash
-kotlinc Server.kt -include-runtime -d server.jar && java -jar server.jar
+./gradlew -q run
 ```
+
+Or click ▶ next to `fun main()`. Either way, compile errors show up before the server starts.
 
 Stop it with Ctrl+C. If you get `Address already in use`, you know what that means (lesson 2).
 
