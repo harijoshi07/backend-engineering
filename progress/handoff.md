@@ -26,8 +26,10 @@ This repo is a self-taught backend course: a public GitHub Pages site plus a tea
 - **How the server got built (2026-11-16):** in a separate claude.ai chat, the learner wrote `handmade/Server.kt` themselves, one step and one commit at a time (e10dcbf → 31a9db1), with names, comments and a commit message per step. They said this depth of back-and-forth is how the course should go. Don't flaw-hunt their learning code.
 - **Lesson 10** (threads, S3), written 2026-11-16 after doing steps 0–1 in chat. The learner did step 0 (slow-client experiment) and step 1 (`thread { handleClient(socket) }`, commit b58b21e). Claude added the log tags at their request (ba0ca81). **Step 2 (fixed thread pool, `pool.execute`) is next for them**, from the lesson.
 - **Process going forward:** write the lesson FIRST (Matt Pocock style, with diagrams and real outputs), then the chat supports it with step-by-step questions. The learner asked why lesson 10 was being done only in chat.
-- **Waiting on the learner:** Think boxes in lessons 7–10 (`maths-l7r-*`, `maths-l8-*`, `maths-l9-*`, `maths-l10-*`).
-- **Next to write:** Lesson 11, Spring Boot + Gradle (S5, S6): what Spring automates from what they built (the loop, the thread pool = Tomcat's 200, routing, writing the response), and teach the Gradle files that were added early.
+- **Lesson 10 done** by the learner (step 2 pool in `Server.kt`, uncommitted as of 2026-11-16 15:30). L10 cost answer was 1k/3k threads (it's ~20k: a thread per *request*), re-asked as L11 recall 1.
+- **Lesson 11** (Spring Boot + Gradle, S5/S6) written 2026-11-16: generate `maths/app/` from start.spring.io (Boot 4.1.2, Kotlin, Gradle-Kotlin, Java 25, Spring Web → `spring-boot-starter-webmvc`), read the build file, rebuild `/health` with `@RestController`, compare the 4 curls (no reason phrase, auto 404/405 with `Allow`, chunked errors, `curl -d` form trap → `hello=`), Tomcat Acceptor/exec/Poller threads via jstack.
+- **Waiting on the learner:** lessons 7–11 Think boxes.
+- **Next to write:** Lesson 12, controllers & DTOs (S7): JSON in/out with data classes, `POST /duels/{code}/answers`, `@PathVariable`, `@RequestBody` DTO, status codes via `ResponseEntity`.
 
 ## Where the learner's answers are
 Every question in a lesson is a `Think` box. Answers sync to the learner's **secret gist "backend-engineering answers"** (`<think-id>.md`), from the site on any device once they've pasted a gist-scoped token, and from chat (Claude writes them there). Fetch from the gist before grading: `gh gist list | grep 'backend-engineering answers'`.
