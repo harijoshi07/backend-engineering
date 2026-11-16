@@ -57,9 +57,9 @@ flowchart TB
 | S2 | **A Kotlin server by hand** (`ServerSocket`): read a request, write a response | S1 | 7–9 ✅ |
 | S3 | **Threads**: serving two clients at once | S2, B1 | 10 ✅ |
 | S4 | **Routing**: method + path picks the function | S2, H5 | 9 ✅ |
-| S5 | **Spring Boot**: what it does for you (the loop, threads, routing, JSON) | S2–S4, H7 | 11 🔜 |
-| S6 | **Gradle project**: dependencies, running the app | S5 | 11 🔜 |
-| S7 | **Controllers & DTOs** | S5, H7 | 12 |
+| S5 | **Spring Boot**: what it does for you (the loop, threads, routing, JSON) | S2–S4, H7 | 11 ✅ |
+| S6 | **Gradle project**: dependencies, running the app | S5 | 11 ✅ |
+| S7 | **Controllers & DTOs** | S5, H7 | 12 🔜 |
 | S8 | **Errors → status codes**; reading logs and stack traces | S7, H6 | 13 |
 | S9 | **Layers**: controller / service / domain / store | S7 | 14 |
 | S10 | **Dependency injection** (like Hilt) | S9 | 14 |

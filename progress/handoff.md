@@ -28,7 +28,8 @@ This repo is a self-taught backend course: a public GitHub Pages site plus a tea
 - **Process going forward:** write the lesson FIRST (Matt Pocock style, with diagrams and real outputs), then the chat supports it with step-by-step questions. The learner asked why lesson 10 was being done only in chat.
 - **Lesson 10 done** by the learner (step 2 pool in `Server.kt`, uncommitted as of 2026-11-16 15:30). L10 cost answer was 1k/3k threads (it's ~20k: a thread per *request*), re-asked as L11 recall 1.
 - **Lesson 11** (Spring Boot + Gradle, S5/S6) written 2026-11-16: generate `maths/app/` from start.spring.io (Boot 4.1.2, Kotlin, Gradle-Kotlin, Java 25, Spring Web → `spring-boot-starter-webmvc`), read the build file, rebuild `/health` with `@RestController`, compare the 4 curls (no reason phrase, auto 404/405 with `Allow`, chunked errors, `curl -d` form trap → `hello=`), Tomcat Acceptor/exec/Poller threads via jstack.
-- **Waiting on the learner:** lessons 7–11 Think boxes.
+- **Lesson 11 done** (2026-11-16): `maths/app/` Spring Boot app with `HealthController` (GET/POST /health) and their own `QuestionController` (GET /question), verified running. L11 answers good; they attribute everything except routing to Tomcat (Spring MVC also writes the body from the return value and does the 404/405).
+- **Waiting on the learner:** nothing open.
 - **Next to write:** Lesson 12, controllers & DTOs (S7): JSON in/out with data classes, `POST /duels/{code}/answers`, `@PathVariable`, `@RequestBody` DTO, status codes via `ResponseEntity`.
 
 ## Where the learner's answers are
