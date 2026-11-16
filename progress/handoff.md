@@ -35,7 +35,7 @@ Every question in a lesson is a `Think` box. Answers sync to the learner's **sec
 2. **Real substance, few analogies.** Use at most ONE familiar example per lesson, ideally from their Android/Wordle world. Run every command and show its true output.
 3. Short lessons, one tangible win each, recall questions at the start, primary source cited.
 4. Quiz options must be the same word count, and the correct answer's position should vary.
-5. **The learner writes the server code**; the teacher explains, asks, and reviews. AI may build the phone client.
+5. ~~The learner writes the server code~~ **Changed 2026-11-16:** Claude writes the server code and teaches it, then gives the learner small changes to make (see `maths/NOTES.md`). AI may build the phone client.
 6. No automated tests for now (the learner's choice).
 7. Goal: by the end they can **build and own** this backend.
 
@@ -43,7 +43,7 @@ Every question in a lesson is a `Think` box. Answers sync to the learner's **sec
 - Both modes are **duels**, in-memory, Kotlin + Spring Boot (JDK 25):
   - **Live Duel**: same questions, same order, 60 seconds, most correct answers wins, opponent's score shown live.
   - **Cross Math Duel**: same grid of equations, first correct solve wins.
-- The code lives in the learner's **private** repo `harijoshi07/maths`, cloned at `~/code/personal/maths` on the work Mac. `handmade/Server.kt` (lessons 7–9) holds the L7 skeleton; the learner fills it in. A minimal Gradle build (Kotlin 2.4.21, JDK 25 toolchain, `srcDir("handmade")`, `./gradlew -q run`) was added early (2026-11-16) because IntelliJ gave no hover docs on a loose .kt file; lesson 10 must still *teach* Gradle. Don't write their server code for them.
+- The code lives in the learner's **private** repo `harijoshi07/maths`, cloned at `~/code/personal/maths` on the work Mac. `handmade/Server.kt` (lessons 7–9) holds the finished L7 server (written by Claude at the learner's request, 2026-11-16). A minimal Gradle build (Kotlin 2.4.21, JDK 25 toolchain, `srcDir("handmade")`, `./gradlew -q run`) was added early (2026-11-16) because IntelliJ gave no hover docs on a loose .kt file; lesson 10 must still *teach* Gradle. Don't write their server code for them.
 
 ## Site
 - Astro 7 + Starlight 0.42, in `site/`.
