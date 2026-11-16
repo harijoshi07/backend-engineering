@@ -53,35 +53,35 @@ flowchart TB
 | H5 | **Methods**: `GET` vs `POST` | H2 | 6 ✅ |
 | H6 | **Status codes**: 2xx / 4xx / 5xx | H3 | 6 ✅ |
 | H7 | **JSON bodies**: `Content-Type` | H2 | 6 ✅ |
-| S1 | **A server is a loop**: accept → read → decide → write | N2, N3, H2, H3 | 7 🔜 |
-| S2 | **A Kotlin server by hand** (`ServerSocket`) | S1 | 7 🔜 |
-| S3 | **Threads**: serving two clients at once | S2, B1 | 8 |
-| S4 | **Routing**: method + path picks the function | S2, H5 | 9 |
-| S5 | **Spring Boot**: what it does for you (the loop, threads, routing, JSON) | S2–S4, H7 | 10 |
-| S6 | **Gradle project**: dependencies, running the app | S5 | 10 |
-| S7 | **Controllers & DTOs** | S5, H7 | 11 |
-| S8 | **Errors → status codes**; reading logs and stack traces | S7, H6 | 12 |
-| S9 | **Layers**: controller / service / domain / store | S7 | 13 |
-| S10 | **Dependency injection** (like Hilt) | S9 | 13 |
-| G1 | **State in memory**: duels in a map, alive while the process runs | B1, S9 | 14 |
-| G2 | **State machine**: WAITING → PLAYING → FINISHED | G1 | 15 |
-| G3 | **Seeds**: same seed, same questions | (Kotlin) | 16 |
-| G4 | **The server's clock**: deadlines | G2 | 17 |
-| C1 | **Race condition**: two threads, one duel, a lost update | S3, G1 | 18 |
-| C2 | **Locks**: one thread at a time inside the duel | C1 | 19 |
-| C3 | **Atomic check-then-act**, thread-safe maps | C2 | 19 |
-| R1 | **Timeout ≠ failure**: the server may have done it | N3, H3 | 20 |
-| R2 | **Retries & idempotency** | R1, G2 | 20 |
-| R3 | **Out-of-order updates**: versions | R2 | 21 |
-| W1 | **Why HTTP can't push**; polling and its cost | N4, H2 | 22 |
-| W2 | **WebSocket**: upgrade, then two-way messages | W1, N3, H2 | 23 |
-| W3 | **WebSockets in Spring**; sessions; push on change | W2, S10, C3 | 24 |
-| W4 | **Disconnects**: heartbeats, reconnect, resync | W3, R3 | 25 |
-| X1 | **Cross Math grid + checker** | G1 | 26 |
-| X2 | **Cross Math generator** | X1, G3 | 27 |
-| X3 | **Cross Math duel** (reuses the duel machinery) | X1, X2, G2, W3 | 28 |
-| P1 | **Phone → laptop**: LAN IP, which address the server listens on, configuration | N1, N2, S6 | 29 |
-| P2 | **API contract** → AI-built app → a real duel 🎮 | all of the above | 30 |
-| ★ | **Own it**: rebuild the core from memory | everything | 31 |
+| S1 | **A server is a loop**: accept → read → decide → write | N2, N3, H2, H3 | 7 ✅ |
+| S2 | **A Kotlin server by hand** (`ServerSocket`): read a request, write a response | S1 | 7–9 ✅ |
+| S3 | **Threads**: serving two clients at once | S2, B1 | 10 🔜 |
+| S4 | **Routing**: method + path picks the function | S2, H5 | 9 ✅ |
+| S5 | **Spring Boot**: what it does for you (the loop, threads, routing, JSON) | S2–S4, H7 | 11 |
+| S6 | **Gradle project**: dependencies, running the app | S5 | 11 |
+| S7 | **Controllers & DTOs** | S5, H7 | 12 |
+| S8 | **Errors → status codes**; reading logs and stack traces | S7, H6 | 13 |
+| S9 | **Layers**: controller / service / domain / store | S7 | 14 |
+| S10 | **Dependency injection** (like Hilt) | S9 | 14 |
+| G1 | **State in memory**: duels in a map, alive while the process runs | B1, S9 | 15 |
+| G2 | **State machine**: WAITING → PLAYING → FINISHED | G1 | 16 |
+| G3 | **Seeds**: same seed, same questions | (Kotlin) | 17 |
+| G4 | **The server's clock**: deadlines | G2 | 18 |
+| C1 | **Race condition**: two threads, one duel, a lost update | S3, G1 | 19 |
+| C2 | **Locks**: one thread at a time inside the duel | C1 | 20 |
+| C3 | **Atomic check-then-act**, thread-safe maps | C2 | 20 |
+| R1 | **Timeout ≠ failure**: the server may have done it | N3, H3 | 21 |
+| R2 | **Retries & idempotency** | R1, G2 | 21 |
+| R3 | **Out-of-order updates**: versions | R2 | 22 |
+| W1 | **Why HTTP can't push**; polling and its cost | N4, H2 | 23 |
+| W2 | **WebSocket**: upgrade, then two-way messages | W1, N3, H2 | 24 |
+| W3 | **WebSockets in Spring**; sessions; push on change | W2, S10, C3 | 25 |
+| W4 | **Disconnects**: heartbeats, reconnect, resync | W3, R3 | 26 |
+| X1 | **Cross Math grid + checker** | G1 | 27 |
+| X2 | **Cross Math generator** | X1, G3 | 28 |
+| X3 | **Cross Math duel** (reuses the duel machinery) | X1, X2, G2, W3 | 29 |
+| P1 | **Phone → laptop**: LAN IP, which address the server listens on, configuration | N1, N2, S6 | 30 |
+| P2 | **API contract** → AI-built app → a real duel 🎮 | all of the above | 31 |
+| ★ | **Own it**: rebuild the core from memory | everything | 32 |
 
 Not in this project (on purpose): databases, accounts and logins, DNS, deploying to the internet. They come in the 100-session course.

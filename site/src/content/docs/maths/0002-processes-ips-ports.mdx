@@ -211,7 +211,7 @@ Usually an old copy of your own server is still running. Find it with `lsof -nP 
 2. **Wrong IP.** The phone has an old or wrong address. Check with `ipconfig getifaddr en0`, since the laptop's address can change when it rejoins the Wi-Fi.
 3. **Wrong port.** The server is listening on a different port than the app uses. Same `lsof` command, without `:8080`: `lsof -nP -iTCP -sTCP:LISTEN`.
 
-(There's a fourth reason, the server listening only on `127.0.0.1`. That brick comes in lesson 29.)
+(There's a fourth reason, the server listening only on `127.0.0.1`. That brick comes in lesson 30.)
 </Think>
 
 ## Read alongside

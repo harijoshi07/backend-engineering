@@ -1,0 +1,49 @@
+---
+// Draws bytes as a row of cells, grouped into labelled segments, so you can *see* a message
+// the way a server reads it: one byte after another. \r and \n get their own visible cells.
+// Optional `cursor` marks the next byte the reader will consume (counted from 0 across all segments).
+interface Segment { label: string; text: string; tone?: 'line' | 'head' | 'gap' | 'body' | 'done' }
+interface Props { segments: Segment[]; cursor?: number; caption?: string }
+const { segments, cursor, caption } = Astro.props;
+
+const show = (c: string) => (c === '\r' ? '\\r' : c === '\n' ? '\\n' : c === ' ' ? '␣' : c);
+let index = 0;
+const groups = segments.map((s) => ({
+  ...s,
+  cells: [...s.text].map((c) => ({ c: show(c), ctrl: c === '\r' || c === '\n', i: index++ })),
+}));
+---
+<figure class="be-bytes not-content">
+  <div class="strip">
+    {groups.map((g) => (
+      <div class={`seg ${g.tone ?? 'line'}`}>
+        <div class="cells">
+          {g.cells.map((cell) => (
+            <span class:list={['cell', { ctrl: cell.ctrl, cur: cell.i === cursor, read: cursor !== undefined && cell.i < cursor }]}>{cell.c}</span>
+          ))}
+        </div>
+        <div class="label">{g.label}</div>
+      </div>
+    ))}
+  </div>
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>
+
+<style>
+  .be-bytes { margin: 1.5rem 0; }
+  .strip { display: flex; flex-wrap: wrap; gap: .9rem .35rem; align-items: flex-start; }
+  .seg { display: flex; flex-direction: column; gap: .25rem; max-width: 100%; }
+  .cells { display: flex; flex-wrap: wrap; border-radius: 6px; overflow: hidden; border: 1px solid var(--tone); }
+  .cell { font-family: var(--sl-font-mono); font-size: .8rem; min-width: 1.35rem; padding: .25rem .2rem; text-align: center; background: color-mix(in srgb, var(--tone) 14%, transparent); color: var(--sl-color-white); border-right: 1px solid color-mix(in srgb, var(--tone) 35%, transparent); }
+  .cell:last-child { border-right: 0; }
+  .cell.ctrl { font-weight: 700; color: var(--tone); }
+  .cell.read { opacity: .35; }
+  .cell.cur { outline: 2px solid var(--sl-color-accent); outline-offset: -2px; background: color-mix(in srgb, var(--sl-color-accent) 30%, transparent); }
+  .label { font-size: var(--sl-text-xs); color: var(--sl-color-gray-3); padding-left: .15rem; border-left: 2px solid var(--tone); }
+  .line { --tone: #3b9e8f; }
+  .head { --tone: #a466b8; }
+  .gap  { --tone: #8a8f98; }
+  .body { --tone: #7a9a3a; }
+  .done { --tone: #c0603a; }
+  figcaption { margin-top: .6rem; font-size: var(--sl-text-sm); color: var(--sl-color-gray-3); }
+</style>

@@ -14,7 +14,7 @@ This repo is a self-taught backend course: a public GitHub Pages site plus a tea
   - `learning-records/`
   - `drafts/`
 - Lessons are MDX pages: `site/src/content/docs/maths/NNNN-*.mdx`.
-- Concept map, the source of lesson order: `site/src/content/docs/maths/map.mdx` (45 concepts, 31 lessons).
+- Concept map, the source of lesson order: `site/src/content/docs/maths/map.mdx` (45 concepts, 32 lessons).
 - Published:
   - **Lesson 1**: Why the game needs a server (source of truth; client/server)
   - **Lesson 2**: Processes, IP addresses, ports
@@ -22,10 +22,10 @@ This repo is a self-taught backend course: a public GitHub Pages site plus a tea
   - **Lesson 4**: Protocols, and the HTTP request (H1, H2)
   - **Lesson 5**: The response, and where a message ends (H3, H4)
   - **Lesson 6**: Methods, status codes, JSON (H5, H6, H7). HTTP layer complete.
-  - **Lesson 7**: A server is a loop (S1, S2). The learner writes `handmade/Server.kt` in their new private `maths` repo from a skeleton; reference solution is behind a reveal.
-- **Graded (2026-11-13):** L1–L6 (records 0002–0006). Persistent misconceptions (wrong twice): a response without length "hangs forever" (it ends at close), and "the server won't know" a no-length request's body size (it's zero). L7 re-asks both and makes them concrete (readAllBytes deadlock demo).
-- **Waiting on the learner:** L7 Think boxes, especially `maths-l7-code` (review it like a PR) and `maths-l7-weakness` (one request at a time → sets up threads).
-- **Next to write:** Lesson 8, threads (S3). Grade L7 first.
+  - **Lessons 7–9** (rewritten 2026-11-16): building the server, step by step, mirroring the learner's own commits in `maths` (A–B lesson 7; C lesson 8; D–F lesson 9). Uses the `ByteStrip` component, mermaid diagrams and an attributed MDN image. Routing (S4) is now covered in lesson 9, so lessons from 10 on shifted (threads = 10, Spring + Gradle = 11, … own-it = 32).
+- **How the server got built (2026-11-16):** in a separate claude.ai chat, the learner wrote `handmade/Server.kt` themselves, one step and one commit at a time (e10dcbf → 31a9db1), with names, comments and a commit message per step. They said this depth of back-and-forth is how the course should go. Don't flaw-hunt their learning code.
+- **Waiting on the learner:** Think boxes in lessons 7–9 (new ids `maths-l7r-*`, `maths-l8-*`, `maths-l9-*`).
+- **Next to write:** Lesson 10, threads (S3): one-client-at-a-time is a problem for duels. Teach it the same way: step by step, with a question before each step, a commit per step, and diagrams.
 
 ## Where the learner's answers are
 Every question in a lesson is a `Think` box. Answers sync to the learner's **secret gist "backend-engineering answers"** (`<think-id>.md`), from the site on any device once they've pasted a gist-scoped token, and from chat (Claude writes them there). Fetch from the gist before grading: `gh gist list | grep 'backend-engineering answers'`.

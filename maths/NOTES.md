@@ -18,6 +18,9 @@
 ## Update 2026-11-16: who writes the server code
 Hari got stuck on lesson 7 and asked Claude to **write the server and teach it** instead. So: Claude writes the code in `maths`, explains it block by block, then hands over small changes for Hari to make (worked example, then completion problems). Ownership is still the goal; fade the help as confidence grows, and check with them before going back to "you write it".
 
+## How lessons should feel (2026-11-16)
+The depth of the chat where Hari built the server: one step at a time, a question before each step, they write the code, review of names and comments, a commit per step, curl output plus the server log read together. Lessons mirror that, with many diagrams (mermaid, `ByteStrip`, attributed MDN images). Don't audit their learning code for robustness unless they ask.
+
 ## Context
 - They built `wordle` (Spring Boot + WebSocket) with heavy AI help; client fully AI. Code was good; their confidence is low.
 - Android background: relate to Retrofit/OkHttp, ViewModel, Room where it helps.

@@ -50,7 +50,7 @@ The program that holds the truth is the **server**. The apps that talk to it are
 - The client's message is a **request**; the server's reply is a **response**. One request, one response.
 - **The client always speaks first.** This is exactly your Retrofit code: `api.getBalance()` is a request, and the returned value is the response. Until now you've always written the left column. In this project you write the right one.
 
-Hold on to one question for later: if the client always speaks first, how does *your* phone find out that *Sita* just scored? (Lesson 22 answers it.)
+Hold on to one question for later: if the client always speaks first, how does *your* phone find out that *Sita* just scored? (Lesson 23 answers it.)
 
 > 📖 **Primary source:** [MDN: Client-Server overview](https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Server-side/First_steps/Client-Server_overview), first two sections (10 min).
 
@@ -121,7 +121,7 @@ fun main() {
 </Steps>
 
 <Aside type="note" title="Two simplifications, both fixed later">
-The server here uses *arrival order*; the real one will stamp answers with its own clock (lesson 17). And `receive()` is called directly; in the real game the answer has to travel from the phone to the server over a network. That's lessons 2–6.
+The server here uses *arrival order*; the real one will stamp answers with its own clock (lesson 18). And `receive()` is called directly; in the real game the answer has to travel from the phone to the server over a network. That's lessons 2–6.
 </Aside>
 
 ## Check yourself
