@@ -24,8 +24,10 @@ This repo is a self-taught backend course: a public GitHub Pages site plus a tea
   - **Lesson 6**: Methods, status codes, JSON (H5, H6, H7). HTTP layer complete.
   - **Lessons 7–9** (rewritten 2026-11-16): building the server, step by step, mirroring the learner's own commits in `maths` (A–B lesson 7; C lesson 8; D–F lesson 9). Uses the `ByteStrip` component, mermaid diagrams and an attributed MDN image. Routing (S4) is now covered in lesson 9, so lessons from 10 on shifted (threads = 10, Spring + Gradle = 11, … own-it = 32).
 - **How the server got built (2026-11-16):** in a separate claude.ai chat, the learner wrote `handmade/Server.kt` themselves, one step and one commit at a time (e10dcbf → 31a9db1), with names, comments and a commit message per step. They said this depth of back-and-forth is how the course should go. Don't flaw-hunt their learning code.
-- **Waiting on the learner:** Think boxes in lessons 7–9 (new ids `maths-l7r-*`, `maths-l8-*`, `maths-l9-*`).
-- **Next to write:** Lesson 10, threads (S3): one-client-at-a-time is a problem for duels. Teach it the same way: step by step, with a question before each step, a commit per step, and diagrams.
+- **Lesson 10** (threads, S3), written 2026-11-16 after doing steps 0–1 in chat. The learner did step 0 (slow-client experiment) and step 1 (`thread { handleClient(socket) }`, commit b58b21e). Claude added the log tags at their request (ba0ca81). **Step 2 (fixed thread pool, `pool.execute`) is next for them**, from the lesson.
+- **Process going forward:** write the lesson FIRST (Matt Pocock style, with diagrams and real outputs), then the chat supports it with step-by-step questions. The learner asked why lesson 10 was being done only in chat.
+- **Waiting on the learner:** Think boxes in lessons 7–10 (`maths-l7r-*`, `maths-l8-*`, `maths-l9-*`, `maths-l10-*`).
+- **Next to write:** Lesson 11, Spring Boot + Gradle (S5, S6): what Spring automates from what they built (the loop, the thread pool = Tomcat's 200, routing, writing the response), and teach the Gradle files that were added early.
 
 ## Where the learner's answers are
 Every question in a lesson is a `Think` box. Answers sync to the learner's **secret gist "backend-engineering answers"** (`<think-id>.md`), from the site on any device once they've pasted a gist-scoped token, and from chat (Claude writes them there). Fetch from the gist before grading: `gh gist list | grep 'backend-engineering answers'`.
