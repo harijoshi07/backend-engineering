@@ -66,8 +66,8 @@ flowchart TB
 | G1 | **State in memory**: duels in a map, alive while the process runs | B1, S9 | 15 ✅ |
 | G2 | **State machine**: WAITING → PLAYING → FINISHED | G1 | 16 ✅ |
 | G3 | **Seeds**: same seed, same questions | (Kotlin) | 17 ✅ |
-| G4 | **The server's clock**: deadlines | G2 | 18 🔜 |
-| C1 | **Race condition**: two threads, one duel, a lost update | S3, G1 | 19 |
+| G4 | **The server's clock**: deadlines | G2 | 18 ✅ |
+| C1 | **Race condition**: two threads, one duel, a lost update | S3, G1 | 19 🔜 |
 | C2 | **Locks**: one thread at a time inside the duel | C1 | 20 |
 | C3 | **Atomic check-then-act**, thread-safe maps | C2 | 20 |
 | R1 | **Timeout ≠ failure**: the server may have done it | N3, H3 | 21 |
