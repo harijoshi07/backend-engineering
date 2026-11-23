@@ -29,7 +29,7 @@ sequenceDiagram
     participant P as Phone
     participant S as Server
     P->>S: WebSocket open, version 4
-    Note over P,S: Phone enters a tunnel; no bytes arrive
+    Note over P,S: Phone enters a tunnel, no bytes arrive
     S->>S: Duel advances to version 7
     Note over P,S: Both ends may still think the socket is open
     P->>S: reconnect after coverage returns
