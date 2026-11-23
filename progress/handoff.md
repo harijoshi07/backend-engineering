@@ -14,7 +14,7 @@ This repo is a self-taught backend course: a public GitHub Pages site plus a tea
   - `learning-records/`
   - `drafts/`
 - Lessons are MDX pages: `site/src/content/docs/maths/NNNN-*.mdx`.
-- Concept map, the source of lesson order: `site/src/content/docs/maths/map.mdx` (45 concepts, 32 lessons).
+- Concept map, the source of lesson order: `site/src/content/docs/maths/map.mdx` (42 concepts, 29 lessons; Cross Math dropped 2026-11-23).
 - Published:
   - **Lesson 1**: Why the game needs a server (source of truth; client/server)
   - **Lesson 2**: Processes, IP addresses, ports
@@ -63,7 +63,8 @@ This repo is a self-taught backend course: a public GitHub Pages site plus a tea
 - **A Lesson 26 draft by another session** (3d9d3ee, ff37add, e4511ce) was removed by the learner in f0ee9c1 "Remove lesson 26 draft from course site"; Claude wrote a fresh one (below) and didn't reuse it.
 - **Lesson 26** (disconnects, W4) written 2026-11-23 on the learner's L25 code: `tunnel.py` asyncio proxy (port 8095 → server; `mode` file: open / tunnel = stop relaying, keep open / down = abort phone side, refuse new, leave server side silent), inlined in the lesson in <details>. Step 1 (demo println "sent version N"): tunnel CYTD: server "sent" v3–5 at 6/10/14 s, phone got all at 32.3 s; down OEJJ: phone 1006 at 2 s, server still sending at 55 s, never `left`; Linux tcp_retries2 924.6 s quoted. Step 2: `PING_EVERY` 5 s / `SILENCE_LIMIT` 15 s, `lastHeard` map, `Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(checkAll)`, ping inside synchronized(session), try/catch per socket ("Subsequent executions are suppressed."), `session.close(SESSION_NOT_RELIABLE)` (4500) → afterConnectionClosed → unwatch (on pool-2-thread-1); handler `handlePongMessage` → `heard`. Real BKFN: closed 18 s after network loss; healthy Node phone 40 s and OkHttp phone 30 s never dropped. Step 3: OkHttp 4.12.0 phone as `phone.main.kts` (`@file:DependsOn`, pingInterval 5 s, backoff 1/2/4/8, keep-newest, onClosing → close): real EYLN: ping failure at 10.2 s, resets, reconnect at 26.8 s → v2 → v5 "(skipped 3–4)"; server dropped old socket after 18 s. Exercise: server restart → reconnect loop every 1 s on 1011 (onOpen resets backoff) → `DUEL_GONE = CloseStatus(4404, "DUEL_NOT_FOUND")` in afterConnectionEstablished + phone stops on 4404 (real). Scratch: new session dir 724b1e5f…/scratchpad (net/, phone/, l26, l26x); helpers still in c15fa3dd…/scratchpad.
 - **Waiting on the learner:** Lesson 26.
-- **Next to write:** Lesson 27, Cross Math grid + checker (X1). Check `map.mdx` and the game description before designing it.
+- **2026-11-23: learner reviewed L26 (heartbeat committed as 39faf51; Claude added scripts/tunnel.py + scripts/phone.main.kts and pushed the maths repo). Learner decided the app is Live Duel only: NO Cross Math (X1-X3 removed from map/index). Next: L27 phone to laptop (P1), L28 API contract for the CMP app (learner will provide a reference), L29 own it. Open server gaps: L25 exercise (scheduled finish at 60 s, so a silent duel is pushed FINISHED) and L26 exercise (4404 DUEL_NOT_FOUND) are not coded.
+- **Next to write:** Lesson 27, phone to laptop (P1).
 
 ## Where the learner's answers are
 Every question in a lesson is a `Think` box. Answers sync to the learner's **secret gist "backend-engineering answers"** (`<think-id>.md`), from the site on any device once they've pasted a gist-scoped token, and from chat (Claude writes them there). Fetch from the gist before grading: `gh gist list | grep 'backend-engineering answers'`.
