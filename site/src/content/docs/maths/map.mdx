@@ -27,9 +27,8 @@ flowchart TB
     G["7 · Two players at once<br/>race conditions · locks"]
     H["8 · Failure<br/>timeouts · retries · idempotency · ordering"]
     I["9 · Live updates<br/>polling · WebSocket · push · heartbeats"]
-    J["10 · Cross Math<br/>grid · checker · generator"]
     K["11 · Play & own it<br/>phone → laptop · API contract · rebuild from memory"]
-    A --> B --> C --> D --> E --> F --> G --> H --> I --> J --> K
+    A --> B --> C --> D --> E --> F --> G --> H --> I --> K
 ```
 
 ## Every brick
@@ -76,12 +75,9 @@ flowchart TB
 | W1 | **Why HTTP can't push**; polling and its cost | N4, H2 | 23 ✅ |
 | W2 | **WebSocket**: upgrade, then two-way messages | W1, N3, H2 | 24 ✅ |
 | W3 | **WebSockets in Spring**; sessions; push on change | W2, S10, C3 | 25 ✅ |
-| W4 | **Disconnects**: heartbeats, reconnect, resync | W3, R3 | 26 🔜 |
-| X1 | **Cross Math grid + checker** | G1 | 27 |
-| X2 | **Cross Math generator** | X1, G3 | 28 |
-| X3 | **Cross Math duel** (reuses the duel machinery) | X1, X2, G2, W3 | 29 |
-| P1 | **Phone → laptop**: LAN IP, which address the server listens on, configuration | N1, N2, S6 | 30 |
-| P2 | **API contract** → AI-built app → a real duel 🎮 | all of the above | 31 |
-| ★ | **Own it**: rebuild the core from memory | everything | 32 |
+| W4 | **Disconnects**: heartbeats, reconnect, resync | W3, R3 | 26 ✅ |
+| P1 | **Phone → laptop**: LAN IP, which address the server listens on, configuration | N1, N2, S6 | 27 🔜 |
+| P2 | **API contract** → AI-built app → a real duel 🎮 | all of the above | 28 |
+| ★ | **Own it**: rebuild the core from memory | everything | 29 |
 
 Not in this project (on purpose): databases, accounts and logins, DNS, deploying to the internet. They come in the 100-session course.
