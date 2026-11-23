@@ -138,7 +138,7 @@ class DuelSocketHandler(
 }
 ```
 
-**Watch first, then read.** If it read the duel first and then registered, a change landing in between would be missed: the phone would sit on an old version until the next change. This way round, the worst case is the same version arriving twice, and Lesson 22's rule (show only if newer) already ignores that.
+**Watch first, then read.** If it read the duel first and then registered, a change landing in between could be missed. Registering first closes that gap, but the initial snapshot and a push can still cross in flight: version 2 can arrive just before the initial version 1. The phone must apply Lesson 22's rule (show only a newer version), which rejects that stale snapshot.
 
 Third, **which path** goes to the handler. That's [Spring's `WebSocketConfigurer`](https://docs.spring.io/spring-framework/reference/web/websocket/server.html):
 
@@ -318,7 +318,7 @@ messages received: 900, sockets closed by the server: 0
 <Aside type="caution" title="What this version leaves out">
 1. **A phone that loses its connection** misses pushes and doesn't know it. That's Lesson 26: heartbeats, reconnecting, and catching up with the version.
 2. **No check on who's watching.** Anyone with a duel's code can watch it. Watching is read-only, so it's like `GET /duels/{code}` today.
-3. **Codes with no duel** leave an empty set in `watchers`. It's harmless, and it's gone when the server restarts.
+3. **Codes with no remaining watchers** leave an empty set in `watchers`. It is reclaimed when the server restarts, but many different codes can leave many empty sets during a long run. Lesson 26 will remove the map entry when its final socket leaves.
 </Aside>
 
 <Aside type="note" title="The thing to remember">
