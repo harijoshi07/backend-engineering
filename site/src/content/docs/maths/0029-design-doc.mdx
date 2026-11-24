@@ -129,7 +129,7 @@ Non-functional requirements, each one a Lesson you've lived:
 | settings change without rebuilding | Lesson 27 | `SERVER_PORT=8081` |
 | it runs in a container and tells you if it's alive | new | `docker run`, `GET /health` |
 
-**Non-goals** (on purpose, so they don't sneak in): a database, accounts, rate limits, more than one server process, and automated tests, which you've chosen to leave for later. The design only has to **not block** a database later.
+**Non-goals** (on purpose, so they don't sneak in): a database, accounts, rate limits, more than one server process, removing old duels, and automated tests, which you've chosen to leave for later. The design only has to **not block** a database later.
 
 <Aside type="caution" title="An assumption, stated plainly">
 One JVM, duels in memory, a few thousand live duels at most. That is a guess about the load, not a measurement. It's why one process is a legitimate design here, and it's the first sentence to revisit if the game gets popular.
@@ -142,6 +142,9 @@ flowchart LR
     P["Phone"] -->|"HTTP"| W["duel.web<br/>controller · DTOs · ErrorMapper"]
     P <-->|"WebSocket"| L["duel.live<br/>sockets · heartbeat · deadline timer"]
     W --> A["duel.application<br/>DuelService · idempotency"]
+    W --> J["duel.api<br/>DuelDto: the shape in API.md"]
+    L --> J
+    J --> D
     L -->|"listens to DuelChanged"| A
     A --> D["duel.domain<br/>Duel · DuelError · Questions"]
     A --> R["DuelRepository<br/>(an interface: a port)"]
@@ -159,10 +162,11 @@ The rule that makes it real, as a table you can check:
 
 | Package | May import | May **not** import |
 |---|---|---|
-| `duel.domain` | Kotlin, `java.time` | Spring, Jackson, sockets, `duel.application` |
+| `duel.domain` | Kotlin, `java.time` | Spring, Jackson, sockets, every other package |
 | `duel.application` | `duel.domain`, Spring's `@Service` and events | `duel.web`, `duel.live`, any HTTP or WebSocket class |
-| `duel.web` | `duel.application`, `duel.domain` errors, Spring Web | `duel.live` |
-| `duel.live` | `duel.application` events, Spring WebSocket | `duel.web` |
+| `duel.api` | `duel.domain` | everything else (it is the one JSON shape that HTTP **and** WebSocket share) |
+| `duel.web` | `duel.application`, `duel.domain`, `duel.api`, Spring Web | `duel.live` |
+| `duel.live` | `duel.application` (events and service), `duel.domain`, `duel.api`, Spring WebSocket | `duel.web` |
 | `infra` | everything it configures | (it only wires) |
 
 You can check the first rule with one command, no test framework. In v2, when it holds, this prints nothing:
@@ -194,6 +198,7 @@ Where everything from v1 goes:
 | `LiveDuels`, `DuelSocketHandler`, ping/silence | `live` |
 | `timer.schedule({ get(code) }, …)` | `live.DeadlineScheduler` |
 | `ErrorHandler` | `web.ErrorMapper` |
+| `DuelResponse` + `toResponse()` | `api`: `DuelDto` (so sockets don't import `web`) |
 | `DUEL_LENGTH`, `PING_EVERY`, `SILENCE_LIMIT` constants | `infra`: `@ConfigurationProperties` |
 
 ## Step 3: the domain, as a sketch
@@ -202,24 +207,25 @@ The domain's job: **given a duel and an event, return the next duel, or say why 
 
 ```kotlin
 sealed interface DuelError {
-    data object NotWaiting : DuelError
-    data object NotPlaying : DuelError
-    data class NotInDuel(val playerName: String) : DuelError
-    data class AlreadyAnswered(val questionIndex: Int, val earlier: Int) : DuelError
-    data class WrongQuestion(val expected: Int, val got: Int) : DuelError
-    data object NoQuestionsLeft : DuelError
+    data class NotWaiting(val code: String, val status: DuelStatus) : DuelError
+    data class NotPlaying(val code: String, val status: DuelStatus) : DuelError
+    data class NotInDuel(val code: String, val playerName: String) : DuelError
+    data class AlreadyAnswered(val playerName: String, val questionIndex: Int, val earlier: Int) : DuelError
+    data class WrongQuestion(val playerName: String, val expected: Int, val got: Int) : DuelError
+    data class NoQuestionsLeft(val playerName: String) : DuelError
+    data class DuelNotFound(val code: String) : DuelError
 }
 ```
 
-This is a **sketch**, not code to type yet. A `sealed interface` lists every case in one place; a `when` over it must handle them all, and the compiler tells you if you forget one. With a string like `"WRONG_QUESTION"` nothing tells you.
+This is nearly the final code, but don't type it yet: Lesson 30 builds it. Each case carries what its message will need. A `sealed interface` lists every case in one place; a `when` over it must handle them all, and the compiler tells you if you forget one. With a string like `"WRONG_QUESTION"` nothing tells you.
 
-`DuelNotFound` isn't here on purpose: the domain never sees a missing duel; the **repository** returns "nothing found", and the **service** turns that into an error. And two errors from `API.md` aren't domain errors at all:
+`DuelNotFound` is in the list so that one type covers every refusal, but the domain never makes it: the **repository** returns "nothing found", and the **service** turns that into this error. Two errors from `API.md` aren't `DuelError`s at all:
 
 | `API.md` error | Where it's born | Why |
 |---|---|---|
 | `BAD_BODY` (400), `NOT_JSON` (415) | `web` | the JSON never became a request; the game wasn't asked |
 | `DUEL_NOT_FOUND` (404) | `application` | the repository found nothing |
-| the six `DuelError` cases | `domain` | a rule refused |
+| the other six cases | `domain` | a rule refused |
 
 One place, `web.ErrorMapper`, turns each into the `API.md` error shape: **one table**, so a status code can't drift between endpoints. Socket close codes (4404, 4500) are mapped in `live` the same way.
 
@@ -276,7 +282,7 @@ sequenceDiagram
     participant T as live.DeadlineScheduler
     participant S as application.DuelService
     participant R as DuelRepository
-    T->>T: at join + 60 s (read from Clock)
+    T->>T: a DuelChanged says PLAYING: set a timer for endsAt
     T->>S: finishIfTimeUp(code)
     S->>R: update(code) { duel -> duel.finishIfTimeUp(now) }
     R-->>S: FINISHED, version +1
@@ -303,17 +309,17 @@ Every lesson from 19 to 26 was one failure. Write them as a table so none is for
 | a slow response overtakes a fast one | 22 | `version` only goes up; phone ignores older | domain |
 | two pushes to one socket at once | 25 | one lock per socket when sending | live |
 | a silent phone, forever in the watchers map | 26 | ping every `PING_EVERY`, drop after `SILENCE_LIMIT` | live |
-| nothing runs at 60 s | 25 | a scheduler fires `finishIfTimeUp` | live |
+| nothing runs at 60 s | 25 | a timer per PLAYING duel fires `finishIfTimeUp` | live |
+| a broken socket turns a stored answer into a 500 | 25 | `sendTo` catches everything | live |
 | a reconnect to a duel that's gone loops forever | 26 | close 4404, the phone stops | live + web |
 | "now" that can't be faked | 18 | an injected `Clock` | infra |
 | a rule that throws deep in the stack | 13, 16 | rules **return** `DuelError` | domain |
 
-Settings go in one place. A `@ConfigurationProperties` class (Lesson 34) reads these, and the Spring `application.properties` plus environment variables set them:
+Settings go in one place. A `@ConfigurationProperties` class (built in Lesson 30) reads these, and the Spring `application.properties` plus environment variables set them:
 
 | Property | Default | Environment variable |
 |---|---|---|
 | `duel.length` | 60 s | `DUEL_LENGTH` |
-| `duel.join-window` | 2 min | `DUEL_JOIN_WINDOW` |
 | `duel.live.ping-every` | 5 s | `DUEL_LIVE_PING_EVERY` |
 | `duel.live.silence-limit` | 15 s | `DUEL_LIVE_SILENCE_LIMIT` |
 | `duel.idempotency-ttl` | 10 min | `DUEL_IDEMPOTENCY_TTL` |
@@ -339,23 +345,23 @@ flowchart LR
 | # | Commit | Check by running |
 |---|---|---|
 | 1 | `docs: design for v2` | none, you wrote it |
-| 2 | `chore: v2 skeleton, Clock bean, empty packages` | app starts on 8081 |
+| 2 | `chore: v2 skeleton, Clock bean, scheduler, properties` | app starts on 8081 |
 | 3 | `domain: Duel as a pure state machine with sealed results` | a scratch script plays a duel through the domain |
 | 4 | `app: DuelRepository port and in-memory adapter` | a scratch script, 1000 concurrent updates |
-| 5 | `app: DuelService with idempotent answers and key expiry` | `curl` retries |
-| 6 | `web: controller, DTOs and ErrorMapper` | `play.mjs` against 8081, every row of the Errors table |
+| 5 | `app: DuelService with idempotent answers and key expiry` | a scratch script with a clock you move by hand |
+| 6 | `web: controller, DTOs and ErrorMapper` | one scripted sequence sent to v1 and v2, answers compared |
 | 7 | `live: socket registry, handler, heartbeat and DuelChanged listener` | two phones, a network cut |
-| 8 | `live: DeadlineScheduler pushes FINISHED at the deadline` | a silent duel, FINISHED at 60 s |
-| 9 | `ops: configuration, logs, health, Dockerfile and runbook` | `docker run`, the Compose app |
+| 8 | `live: DeadlineScheduler pushes FINISHED at the deadline` | a silent duel, FINISHED pushed at the deadline; `play.mjs` |
+| 9 | `ops: configuration, logs, health, Dockerfile and runbook` | `docker run`, `play.mjs`, the Compose app |
 
-Commit 6 is the first time the app is **usable** again; 7 and 8 bring back the live part. That order is deliberate: after commit 6, v2 can already be played over HTTP, exactly like Lesson 23's polling phone.
+Commit 6 is the first time the app is **usable** again; 7 and 8 bring back the live part. That order is deliberate: after commit 6, v2 can already be played over HTTP, exactly like Lesson 23's polling phone. (`play.mjs` needs the sockets, so it joins in at commit 7.)
 
 <Quiz
   question="Which package may import Spring's web classes?"
   options={[
     'duel.web, which adapts HTTP',
     'duel.domain, for DTO types',
-    'duel.application, for statuses',
+    'duel.application, for HTTP statuses',
   ]}
   answer={0}
 >

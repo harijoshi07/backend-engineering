@@ -1,0 +1,219 @@
+---
+title: '35 · Review: v1 against v2'
+description: 'Measure what the redesign bought, in the same numbers that justified it. Then change the game''s rules in v2 and count which files move. Finish with an honest list of what v2 still doesn''t do, which is the map of what to learn next.'
+sidebar:
+  label: '35 · Review: v1 and v2'
+  order: 35
+---
+
+import Quiz from '../../../components/Quiz.astro';
+import Think from '../../../components/Think.astro';
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="tip" title="4 steps · ≈45 min · one more commit">
+**Step 1:** the same measurements as Lesson 29, on v2. **Step 2:** behaviour that is better, behaviour that is the same. **Step 3:** change a rule and count the files. **Step 4:** what v2 still doesn't do. Win: you can say, with numbers, why the rebuild was worth it, and what it did *not* fix.
+</Aside>
+
+## Recall (from memory)
+
+<Think id="maths-l35-recall-1" prompt="Lesson 33: when a duel changes, name the chain of calls until a phone's socket gets the message. (Start at the service.)" revealLabel="Check">
+`DuelService.change` stores the new version, then `publishEvent(DuelChanged(duel))` (after `update` has returned); Spring calls `LiveDuels.on(event)` on the same thread, which calls `sendTo` for every socket in `watchers[code]`, each inside `synchronized(session)` and a `try`/`catch`. `DeadlineScheduler.on` hears the same event.
+</Think>
+
+<Think id="maths-l35-recall-2" prompt="Lesson 32: which statement in the ErrorMapper makes the compiler refuse a new DuelError that nobody mapped?" revealLabel="Check">
+The `when (this)` over the **sealed** `DuelError` with no `else`. A `when` used as an expression over a sealed type must cover every case, so a new case is a compile error until the mapper handles it.
+</Think>
+
+## Step 1: the same measurements
+
+In Lesson 29 we counted how many reasons `DuelService` had to change. Same command, both versions (the number is the count of lines that mention each concern):
+
+```text
+DuelService.kt: v1 190 lines, v2 93 lines
+(lines that mention each concern)
+DuelConflictException\|NotInDuelException\|DuelNotFound        v1 6   v2 1
+Instant.now\|DUEL_LENGTH                                       v1 3   v2 0
+liveDuels\|timer                                               v1 4   v2 0
+createOnce\|requestKey\|earlier                                v1 8   v2 3
+version                                                        v1 2   v2 1
+println                                                        v1 3   v2 0
+randomCode\|Random                                             v1 4   v2 3
+```
+
+Read it row by row:
+
+- **Time**: v1's service reached for `Instant.now()` and a constant; v2's mentions neither. Time arrives as a `Clock`.
+- **Sockets and timers**: 4 → 0. The service no longer knows `LiveDuels` or a timer exists.
+- **Errors**: 6 → 1. v1's service threw three kinds of exception; v2's only names `DuelNotFound`, the one error that is *its* job.
+- **Printing**: 3 → 0. Logging moved to structured SLF4J calls.
+- **File size**: 190 → 93 lines.
+
+The Spring imports per package, which is the dependency rule from Lesson 29 measured:
+
+```text
+duel/domain        0
+duel/application   3
+duel/api           0
+duel/web           14
+duel/live          21
+infra              7
+```
+
+`domain` and `api` import no Spring at all, and `application` imports only `@Service`, `@Component` and the event publisher. The sockets and HTTP live where they should: 21 in `live`, 14 in `web`.
+
+And the size of everything:
+
+| | v1 | v2 |
+|---|---|---|
+| Kotlin files | 15 | 21 |
+| lines | 753 | 871 |
+
+v2 is **bigger**. That is the honest cost of the design: more files, more names, about 15% more lines. What it also contains that v1 didn't: key expiry, the join retry, the deadline timer's cancel, typed settings, health, a startup log, structured logging. The question isn't "is it smaller?" but "where does a change go?", and that is Step 3.
+
+## Step 2: what changed for the phone, what didn't
+
+Nothing in `API.md` changed. Lesson 32 proved it with one scripted sequence sent to both servers. What's **better** behind the same contract:
+
+| Behaviour | v1 | v2 |
+|---|---|---|
+| a broken socket during a push | the answer could become a 500 | the answer is a 200, the socket is closed, a WARN is logged |
+| a retried `join` by the same player | `409 DUEL_NOT_WAITING` | `200`, the same duel |
+| an `Idempotency-Key` | remembered forever, returns the creation snapshot | remembered for 10 min, returns the current duel |
+| the deadline timer | one per join, never cancelled | one per playing duel, cancelled when the duel finishes early |
+| the deadline test | a real 61 s wait | `Clock` moved by hand, milliseconds |
+| changing the duel length | edit a constant, rebuild | `DUEL_LENGTH=20s` |
+| what happens at start-up with a typo | n/a | the app refuses to start and names it |
+
+What is **the same** on purpose: every status, error name, message, version number and the socket protocol (close codes 4404 and 4500, ping every 5 s).
+
+<Think id="maths-l35-v1" prompt="v1 is still in the main branch and still runs. Name two reasons NOT to delete it." revealLabel="Check">
+(1) It is the **reference**: any behaviour question ('what did the server do before?') can be answered by running it, as Lesson 32's comparison did. (2) It is **your learning record**: every commit of it matches a lesson. Deleting it saves nothing and loses the comparison. (And git keeps it anyway, so keeping it running costs only a port.)
+</Think>
+
+## Step 3: change a rule, count the files
+
+Here is the test of a design: add a rule and see which files move. The rule: **a player may not join under the creator's own name** (`API.md` today only says the server doesn't check). New behaviour: `409 SAME_NAME`.
+
+Write it in `maths-v2`. The three code changes:
+
+```kotlin
+// domain/DuelError.kt: one more case
+    data class SameName(val playerName: String) : DuelError
+
+// domain/Duel.kt: first lines of join
+    fun join(opponent: String, now: Instant, length: Duration): Outcome<Duel> {
+        // Two players need two names
+        if (opponent == playerName) {
+            return Outcome.Rejected(DuelError.SameName(opponent))
+        }
+        ...
+
+// web/ErrorMapper.kt: one more branch of the table
+        is DuelError.SameName ->
+            HttpStatus.CONFLICT to ErrorBody("SAME_NAME", "$playerName is already in this duel, pick another name")
+```
+
+Then add a row to `API.md`'s Errors table (and change the line saying the server doesn't check names). Build, run, check:
+
+```text
+$ git diff --stat
+ API.md                                                      | 3 ++-
+ app/src/main/kotlin/dev/hari/maths/duel/domain/Duel.kt      | 4 ++++
+ app/src/main/kotlin/dev/hari/maths/duel/domain/DuelError.kt | 1 +
+ app/src/main/kotlin/dev/hari/maths/duel/web/ErrorMapper.kt  | 2 ++
+ 4 files changed, 9 insertions(+), 1 deletion(-)
+
+$ curl -s -XPOST localhost:8081/duels/OWHD/join -H 'content-type: application/json' -d '{"playerName":"Hari"}' -w "  [%{http_code}]\n"
+{"error":"SAME_NAME","message":"Hari is already in this duel, pick another name"}  [409]
+$ curl -s -XPOST localhost:8081/duels/OWHD/join -H 'content-type: application/json' -d '{"playerName":"Sita"}' -w "  [%{http_code}]\n"
+{"code":"OWHD","playerName":"Hari","status":"PLAYING","opponentName":"Sita", …   [200]
+```
+
+Four files, nine lines. And the ones that **didn't** move are the point: nothing in `application`, nothing in `live`, nothing in `infra`, not the repository, the socket handler or the heartbeat. The compiler forced the right one: until you added the branch to `ErrorMapper`, the build failed with the `'when' expression must be exhaustive` line from Lesson 32. In v1 the same rule would have touched the service, a new exception class and the handler.
+
+```text
+Commit: feat: refuse a join under the creator's own name
+```
+
+<Think id="maths-l35-change" prompt="Another rule: 'a finished duel is deleted from memory 5 minutes after it finishes'. Using the design, list which package gets the new code, which existing class it must call, and one thing in the repository port that must change." revealLabel="Check">
+New code: a small component in `application` (or `infra`) that runs on the shared scheduler and, for each finished duel older than 5 minutes, deletes it. It would need the **port** to learn a new operation, `remove(code)` (and a way to list or find expired duels), and `InMemoryDuelRepository` implements it. The domain doesn't change (a duel already knows when it finished if you give it a `finishedAt`), and nor do `web` and `live`. It also closes a gap both versions share: duels are never removed today.
+</Think>
+
+## Step 4: what v2 still doesn't do
+
+A design is also what it leaves out. The "Not covered" list from your README, with what each would need:
+
+| Missing | What it would take | Which package changes |
+|---|---|---|
+| **Persistence**: a restart forgets every duel | a database adapter for `DuelRepository` (and one for `IdempotencyStore`) | `infra` only (that's what the port is for) |
+| **Cleaning up**: old and abandoned duels stay in memory forever | a `remove` on the port, a sweeper | `application`, `infra` |
+| **Accounts**: any client can answer under any name | authentication; a player id the server issues | `web` and `domain` (a `playerId`) |
+| **Abuse limits**: nothing stops 1,000 creates per second | a rate limit at the edge or in a filter | `web` / infrastructure |
+| **More than one server**: events, timers and sockets live in one process | a shared store and a message broker | `infra`, `live` (a big change) |
+| **Automated tests** | your decision to leave them for later | all of them |
+
+The design makes the first two cheap and the fifth expensive, and that's useful to know *before* someone asks for it. Everything on this list is a topic in the 100-session course, which is where you go next.
+
+## What "owning" this means now
+
+You can own v2 when you can do these without help, using only the repo and your README:
+
+- Draw the package diagram and say what each arrow means.
+- Say where a new rule, a new error, a new setting and a new push go.
+- Reproduce one of the real runs: a cut network, 600 answers at once, a duel nobody answers, a typo in a setting.
+- Say what the phone app must do that the server can't (the five rules of Lesson 28).
+
+<Quiz
+  question="Why is v2 about 15% more lines than v1?"
+  options={[
+    'Kotlin generates a lot more code',
+    'It does more, in more files',
+    'The comments were accidentally duplicated everywhere',
+  ]}
+  answer={1}
+>
+More classes (ports, adapters, an event, a mapper) and more behaviour (expiry, retries, cancellation, health, config). A redesign usually costs lines; what it buys is where changes go.
+</Quiz>
+
+<Quiz
+  question="The SAME_NAME rule needed which kinds of change?"
+  options={[
+    'Domain, mapper, and contract',
+    'Service, sockets, and database',
+    'Controller, heartbeat, and scheduler',
+  ]}
+  answer={0}
+>
+A rule (domain), its HTTP translation (the mapper's one `when`) and the contract (`API.md`). Nothing about how it's stored, announced or pushed.
+</Quiz>
+
+<Quiz
+  question="Which missing feature does the repository port make cheap?"
+  options={[
+    'Accounts and logins for players',
+    'Rate limiting every incoming request',
+    'Persisting duels in a database',
+  ]}
+  answer={2}
+>
+Storage sits behind the port, so a database is a new adapter and a changed bean. Accounts and rate limits need new concepts in `web` and the domain.
+</Quiz>
+
+## Your turn
+
+<Think id="maths-l35-own" prompt="Without looking at the code: explain to someone who'll maintain v2 how an answer travels from a phone to the other phone, naming the classes in order, and where a refusal turns into a status code. (This is the final check of the whole project.)" revealLabel="Compare with a model answer">
+The phone `POST`s to `DuelController.answer`, which calls `DuelService.answer`; the service's `change` takes the time once and runs a rule inside `DuelRepository.update` (the adapter makes read–decide–write atomic): the service first applies `finishIfTimeUp`, then `Duel.answer`, which returns `Ok(AnswerResult)` or `Rejected(DuelError)`. If the version moved, the service publishes `DuelChanged` *after* the update, and Spring runs `LiveDuels.on` on the same thread, which sends the whole duel (as `DuelDto`) to every socket watching that code, under a per-socket lock and a try/catch, while `DeadlineScheduler` keeps or cancels its timer. Back in the controller the `Outcome` becomes the response: `Ok` is mapped into `AnswerResponse`, `Rejected` goes through the one `when` in `ErrorMapper` to the status and error name from `API.md`. The other phone sees the new version on its socket and shows it only if the version is higher.
+</Think>
+
+<Think id="maths-l35-teachback" prompt="In 4–5 sentences: if you had to explain to a new teammate why this backend was rebuilt, what would you say it cost, what it bought, and what it still doesn't do?" revealLabel="Compare with a model answer">
+The rebuild cost a few more files and about 15% more lines, and nothing in the contract changed, which a scripted sequence against both versions proved. It bought one home per concern: the rules are an immutable domain that returns refusals, the service only loads, applies, stores and announces, and the sockets, heartbeat and deadline react to an event, so a new rule like `SAME_NAME` touched four files and none of the application, live or infra code. Time, settings, health and logs are injected or configured, so the deadline is testable without waiting and every setting changes without a rebuild. It still keeps everything in memory, never removes old duels, has no accounts or rate limits, runs as a single process and has no automated tests, and the repository port is what makes the first of those cheap to fix.
+</Think>
+
+## Read alongside
+- 📖 **Primary:** [Martin Fowler, "Patterns of Enterprise Application Architecture": Repository](https://martinfowler.com/eaaCatalog/repository.html): the idea behind the port (10 min).
+- [The Twelve-Factor App](https://12factor.net/): the checklist behind most of Lesson 34.
+- [Spring Data JDBC reference](https://docs.spring.io/spring-data/relational/reference/jdbc.html): where a database adapter would start (not needed now).
+
+🙋 Ask me: "how would a Postgres adapter for the port look?", "what would a deployment lesson cover?", "what's the smallest change to make this horizontally scalable?", "review my v2 against the design".
+
+**Next:** back to the 100-session course (it paused at S1). The maths backend is done; the next topic, databases, replaces the in-memory adapter.

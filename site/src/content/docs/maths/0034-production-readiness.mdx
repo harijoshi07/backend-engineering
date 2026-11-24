@@ -1,0 +1,425 @@
+---
+title: '34 · Production readiness'
+description: 'A program that works on your laptop isn''t ready to run somewhere else. Make every setting changeable without a rebuild, add health checks, structured logs and graceful shutdown, put it in a Docker image, and write the runbook someone else could follow at 3 a.m.'
+sidebar:
+  label: '34 · Production readiness'
+  order: 34
+---
+
+import Quiz from '../../../components/Quiz.astro';
+import Think from '../../../components/Think.astro';
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="tip" title="5 steps · ≈75 min · commit 9">
+**Step 1:** settings, proven. **Step 2:** health. **Step 3:** logs. **Step 4:** a Docker image. **Step 5:** the runbook, and your phone app against v2. Win: `docker run` starts a configured v2 that `play.mjs` can play on, and a stranger can operate it from the README.
+</Aside>
+
+## Recall (from memory)
+
+<Think id="maths-l34-recall-1" prompt="Lesson 27: when SERVER_ADDRESS is set as an environment variable AND --server.address is on the command line, which wins?" revealLabel="Check">
+The **command line** wins over the environment variable (that was the real run in Lesson 27). Spring has a fixed order; command-line arguments are near the top.
+</Think>
+
+<Think id="maths-l34-recall-2" prompt="Lesson 21: how long did v1 remember an Idempotency-Key, and what does v2 do about it?" revealLabel="Check">
+v1 remembered keys **forever** (the caution at the end of Lesson 21). v2's `IdempotencyStore` forgets a key after `duel.idempotency-ttl` (10 minutes) and sweeps old ones every ten minutes.
+</Think>
+
+## What "production-ready" means here
+
+Nothing magic. Five questions that someone running your server will ask, each answered by a file:
+
+| Question | Answered by |
+|---|---|
+| How do I change a setting without a rebuild? | `DuelProperties` + environment variables |
+| Is it alive? Should traffic go to it? | health endpoints |
+| What is it doing? | logs with fields |
+| How do I run it somewhere that isn't your laptop? | a Docker image |
+| It's 3 a.m. and something is wrong | the runbook |
+
+## Step 1: settings, proven
+
+You built `DuelProperties` in Lesson 30. Prove that every layer of override works, using the startup line that `infra/StartupLog.kt` prints:
+
+```kotlin
+// app/src/main/kotlin/dev/hari/maths/infra/StartupLog.kt
+package dev.hari.maths.infra
+
+import org.slf4j.LoggerFactory
+import org.springframework.boot.ApplicationArguments
+import org.springframework.boot.ApplicationRunner
+import org.springframework.stereotype.Component
+
+// The first thing to ask when something looks wrong: which settings did this process start with?
+@Component
+class StartupLog(private val properties: DuelProperties) : ApplicationRunner {
+    private val log = LoggerFactory.getLogger(javaClass)
+
+    override fun run(args: ApplicationArguments) {
+        log.atInfo()
+            .addKeyValue("length", properties.length)
+            .addKeyValue("idempotencyTtl", properties.idempotencyTtl)
+            .addKeyValue("pingEvery", properties.live.pingEvery)
+            .addKeyValue("silenceLimit", properties.live.silenceLimit)
+            .log("duel settings")
+    }
+}
+```
+
+```text
+$ ./gradlew bootRun
+12:12:58.775 INFO  [main] StartupLog       duel settings length="PT1M" idempotencyTtl="PT10M" pingEvery="PT5S" silenceLimit="PT15S"
+
+$ DUEL_LENGTH=20s ./gradlew bootRun
+12:13:03.430 INFO  [main] StartupLog       duel settings length="PT20S" idempotencyTtl="PT10M" pingEvery="PT5S" silenceLimit="PT15S"
+
+$ DUEL_LENGTH=20s ./gradlew bootRun --args='--duel.length=5s'
+12:13:07.546 INFO  [main] StartupLog       duel settings length="PT5S" idempotencyTtl="PT10M" pingEvery="PT5S" silenceLimit="PT15S"
+
+$ DUEL_LIVE_SILENCE_LIMIT=45s DUEL_IDEMPOTENCY_TTL=1h ./gradlew bootRun
+12:13:11.649 INFO  [main] StartupLog       duel settings length="PT1M" idempotencyTtl="PT1H" pingEvery="PT5S" silenceLimit="PT45S"
+```
+
+Read it: a plain start uses the defaults you wrote; `DUEL_LENGTH=20s` changes the length with **no rebuild**; the command line beats the environment variable; and several settings can change at once. And what about a wrong value?
+
+```text
+$ DUEL_LENGTH=soon ./gradlew bootRun
+APPLICATION FAILED TO START
+Failed to bind properties under 'duel.length' to java.time.Duration:
+    Property: duel.length
+    Value: "soon"
+    Origin: System Environment Property "DUEL_LENGTH"
+    Reason: failed to convert java.lang.String to java.time.Duration (caused by java.lang.IllegalArgumentException: 'soon' is not a valid duration)
+```
+
+A typo is caught **at start-up**, with the property, the value, *where it came from* (the environment variable) and why. A server that silently fell back to 60 s would be much worse than one that refuses to start.
+
+Write the file with the documented defaults commented out, so the file itself is the list of settings (`app/src/main/resources/application.properties`):
+
+```properties
+// app/src/main/resources/application.properties
+spring.application.name=maths
+
+# Every setting of the game has a default in infra/DuelProperties.kt.
+# Override one here, or with an environment variable: DUEL_LENGTH=20s
+#duel.length=60s
+#duel.idempotency-ttl=10m
+#duel.live.ping-every=5s
+#duel.live.silence-limit=15s
+
+# Health: /actuator/health (and /actuator/health/liveness, /actuator/health/readiness)
+management.endpoints.web.exposure.include=health,info
+management.endpoint.health.probes.enabled=true
+
+# On SIGTERM, finish the requests in flight (up to 10 s) before stopping
+server.shutdown=graceful
+spring.lifecycle.timeout-per-shutdown-phase=10s
+
+# Text logs for the terminal: the message plus the key=value pairs we attach (%kvp)
+logging.pattern.console=%d{HH:mm:ss.SSS} %-5level [%thread] %-16logger{0} %msg %kvp%n
+```
+
+## Step 2: health
+
+Spring's *Actuator* adds ready-made operational endpoints. Add one line to `app/build.gradle.kts`:
+
+```kotlin
+implementation("org.springframework.boot:spring-boot-starter-actuator")
+```
+
+The two `management.*` lines in the properties above expose only `health` and `info` (never expose more than you need), and turn on the **probes**:
+
+```text
+$ curl -s localhost:8081/actuator/health
+{"groups":["liveness","readiness"],"status":"UP"}
+$ curl -s localhost:8081/actuator/health/readiness
+{"status":"UP"}
+$ curl -s localhost:8081/actuator/health/liveness
+{"status":"UP"}
+```
+
+Two endpoints, two different questions:
+
+| Endpoint | Question | If it fails |
+|---|---|---|
+| `/actuator/health/liveness` | is the process healthy at all? | restart it |
+| `/actuator/health/readiness` | can it take traffic now? | stop sending traffic, but don't restart |
+
+Today both are always `UP`. They matter when something that runs your container (a load balancer, Kubernetes, a platform) asks them every few seconds. During startup and shutdown, Spring flips readiness for you.
+
+`server.shutdown=graceful` plus `spring.lifecycle.timeout-per-shutdown-phase=10s` mean: on a stop signal (SIGTERM, what `docker stop` sends) the server stops accepting new requests and gives the ones in flight up to ten seconds. Our requests are all milliseconds, so you'll rarely see it work, but a platform that deploys a new version by stopping the old one relies on it.
+
+## Step 3: logs with fields
+
+Look at how v2 logs: `log.atInfo().addKeyValue("duel", code).addKeyValue("socket", id).log("socket watches")`. The message stays the same text every time; the changing parts are **fields**. On your terminal the pattern in `application.properties` prints them as `key="value"` pairs:
+
+```text
+11:50:40.800 INFO  [duel-timer-1] Heartbeat        socket silent, closing socket="2278de94-…" silentSeconds="19"
+```
+
+In production nobody reads a terminal; a log system collects lines and you search it. For that, one line should be one JSON object. One profile switches it (`app/src/main/resources/application-prod.properties`):
+
+```properties
+// app/src/main/resources/application-prod.properties
+# Profile "prod" (SPRING_PROFILES_ACTIVE=prod): one JSON object per log line,
+# so a log system can search by field (duel, socket, ...)
+logging.structured.format.console=logstash
+```
+
+Run with `SPRING_PROFILES_ACTIVE=prod` and the same events become:
+
+```text
+{"@timestamp":"2026-11-24T06:20:10.997999376Z","@version":"1","message":"duel settings","logger_name":"dev.hari.maths.infra.StartupLog","thread_name":"main","level":"INFO","level_value":20000,"length":"PT15S","idempotencyTtl":"PT10M","pingEvery":"PT5S","silenceLimit":"PT15S"}
+{"@timestamp":"2026-11-24T06:20:12.193880053Z","@version":"1","message":"duel created","logger_name":"dev.hari.maths.duel.application.DuelService","thread_name":"http-nio-8080-exec-9","level":"INFO","level_value":20000,"duel":"LSMP","seed":273034459597058704}
+{"@timestamp":"2026-11-24T06:20:12.348785902Z","@version":"1","message":"socket watches","logger_name":"dev.hari.maths.duel.live.LiveDuels","thread_name":"http-nio-8080-exec-10","level":"INFO","level_value":20000,"duel":"LSMP","socket":"e4a93e09-03c5-414a-b257-a7a345ef018e","watching":1}
+```
+
+Now `duel` and `socket` are **fields** a log system can filter on: "show me everything that happened to duel LSMP" is a search, not a regex. That's the difference between `println("duel $code ...")` in v1 and what you have now. (Notice the thread names too: `http-nio-8080-exec-10`, `duel-timer-1`.)
+
+## Step 4: a Docker image
+
+A **container image** is your app plus exactly the Java it needs, in one file you can run anywhere with Docker. `app/Dockerfile`:
+
+```
+// app/Dockerfile
+# Stage 1: build the jar with the JDK
+FROM eclipse-temurin:25-jdk AS build
+WORKDIR /src
+COPY gradle gradle
+COPY gradlew build.gradle.kts settings.gradle.kts ./
+RUN ./gradlew --no-daemon dependencies > /dev/null 2>&1 || true
+COPY src src
+RUN ./gradlew --no-daemon bootJar -x test
+
+# Stage 2: run it with only the JRE, as a user that isn't root
+FROM eclipse-temurin:25-jre
+RUN useradd --system --create-home duel
+USER duel
+WORKDIR /home/duel
+COPY --from=build /src/build/libs/*.jar app.jar
+EXPOSE 8080
+# No HEALTHCHECK here: the JRE image has no curl. Whoever runs the container asks
+# GET /actuator/health/readiness (Kubernetes probes, a load balancer, docker run --health-cmd).
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+
+Two stages. Stage 1 has the whole JDK and builds the jar; stage 2 starts from a smaller JRE and copies in only the jar, so the image has no compiler and no source. The `dependencies` line before `COPY src` is for speed: Docker caches each step, so a change to your code doesn't download the libraries again. The app runs as `duel`, not as root, so a bug in it can't do more than `duel` can. `.dockerignore` (`build`, `.gradle`, `.kotlin`, `HELP.md`) keeps your build folders out of the build.
+
+Build and run it. The container listens on 8080 inside, and we publish it as 8081 outside:
+
+```bash
+cd ~/code/personal/maths-v2/app
+docker build -t maths-v2 .
+docker run -d --name maths -p 8081:8080 -e DUEL_LENGTH=15s -e SPRING_PROFILES_ACTIVE=prod maths-v2
+node ../scripts/play.mjs localhost:8081
+docker stop maths
+```
+
+```text
+$ docker build -t maths-v2 .
+...
+$ docker images maths-v2 --format "{{.Repository}}:{{.Tag}} {{.Size}}"
+maths-v2:latest 581MB
+
+$ docker run -d --name maths -p 8081:8080 -e DUEL_LENGTH=15s -e SPRING_PROFILES_ACTIVE=prod maths-v2
+$ node scripts/play.mjs localhost:8081 | sed -n '1,3p;$p'
+  0.3s  Hari  created duel LSMP
+  0.3s  Hari  sees v1 WAITING scores {"Hari":0}
+  0.6s  Sita  joined
+  1.2s  both  done
+
+$ time docker stop maths
+maths
+docker stop maths  0.01s user 0.01s system 7% cpu 0.206 total
+```
+
+The environment variables you pass with `-e` are exactly the Step 1 settings. The JRE image has no `curl`, so the Dockerfile has no `HEALTHCHECK`; whatever runs the container asks the readiness URL itself.
+
+<Think id="maths-l34-docker" prompt="You push the image to a server with 4 CPUs and 1 GB of RAM, and want a 30-second duel and 10-second pings, without rebuilding. Write the docker run command (the image is called maths-v2, listen on host port 80)." revealLabel="Check">
+`docker run -d -p 80:8080 -e DUEL_LENGTH=30s -e DUEL_LIVE_PING_EVERY=10s -e SPRING_PROFILES_ACTIVE=prod maths-v2`. Same image, different settings: that's what putting the configuration outside the code buys. (Memory: `-m 1g` limits the container, and the JVM sizes its heap from it automatically.)
+</Think>
+
+## Step 5: the runbook, and your phone
+
+Write `README.md` at the top of `maths-v2` for **someone who has never seen the code**: what it is, how to run it, the settings table, Docker, health, what each log message means, and a symptom → where to look → likely cause table. This is the file you'd want at 3 a.m. Here is mine:
+
+<details>
+<summary>README.md</summary>
+
+````markdown
+// README.md
+# maths: Live Duel backend (v2)
+
+Two players get the same five multiplication questions; the one with more correct answers when the 60 seconds are up (or both have answered everything) wins. The contract with the phone app is [`API.md`](API.md). The design is [`docs/DESIGN.md`](docs/DESIGN.md).
+
+## Run it
+
+```bash
+cd app
+./gradlew bootRun                                   # port 8080
+./gradlew bootRun --args='--server.port=8081'       # another port
+```
+
+Needs JDK 25. Check it: `curl localhost:8080/actuator/health` → `{"status":"UP",...}`.
+
+Play a whole duel with two scripted phones: `node scripts/play.mjs localhost:8080`.
+
+## Configure it
+
+Defaults live in `app/src/main/kotlin/dev/hari/maths/infra/DuelProperties.kt`. Override with `application.properties` or an environment variable (a command-line `--duel.length=20s` beats an environment variable).
+
+| Property | Default | Environment variable | What it does |
+|---|---|---|---|
+| `duel.length` | `60s` | `DUEL_LENGTH` | duel length from the second player's join |
+| `duel.idempotency-ttl` | `10m` | `DUEL_IDEMPOTENCY_TTL` | how long an `Idempotency-Key` is remembered |
+| `duel.live.ping-every` | `5s` | `DUEL_LIVE_PING_EVERY` | server ping to every socket |
+| `duel.live.silence-limit` | `15s` | `DUEL_LIVE_SILENCE_LIMIT` | a socket silent this long is closed (code 4500) |
+| `server.port` | `8080` | `SERVER_PORT` | HTTP and WebSocket port |
+| `server.address` | all | `SERVER_ADDRESS` | e.g. `127.0.0.1` to refuse other machines |
+| profile `prod` | off | `SPRING_PROFILES_ACTIVE=prod` | JSON logs |
+
+The first line after start-up, `duel settings`, prints the values the process actually uses.
+
+## Docker
+
+```bash
+cd app
+docker build -t maths-v2 .
+docker run --rm -p 8081:8080 -e DUEL_LENGTH=30s -e SPRING_PROFILES_ACTIVE=prod maths-v2
+```
+
+Stop it with `docker stop` (SIGTERM): requests in flight get up to 10 s to finish.
+
+## Health
+
+| URL | Meaning |
+|---|---|
+| `/actuator/health` | overall status |
+| `/actuator/health/liveness` | the process is running (restart it if this fails) |
+| `/actuator/health/readiness` | it accepts traffic (stop sending to it if this fails) |
+
+## Logs
+
+Terminal: `time level [thread] logger message key="value" …`. With the `prod` profile each line is one JSON object. Useful fields: `duel` (the code), `socket` (the session id), `reason`.
+
+| Message | Meaning |
+|---|---|
+| `duel created` | new duel (`seed` shows the questions' seed) |
+| `socket watches` / `socket left` | a phone connected / disconnected |
+| `socket silent, closing` | no pong for `silenceLimit`: the network died |
+| `push failed, closing socket` | a push threw; the answer that caused it was still stored |
+| `deadline failed` | the timer could not finish a duel (read `reason`) |
+| `bad body` / `not json` | a client sent something the API refuses (400 / 415) |
+| `idempotency keys swept` | housekeeping, `removed` = keys forgotten |
+
+## Runbook
+
+| Symptom | Look at | Likely cause |
+|---|---|---|
+| every request 404 `DUEL_NOT_FOUND` after a restart | `duel settings` timestamp | duels live in memory; a restart forgets them (by design) |
+| phone never sees the opponent's answer | `socket watches` for that duel | the socket never opened or was dropped; check `socket silent` |
+| a duel stays PLAYING after the time | `deadline failed`; `duel settings` for `length` | the timer failed, or the length is bigger than you think |
+| phones reconnect in a loop | close code in the client log | 4404 means stop; anything else, read `socket silent` |
+| `Connection refused` from a phone | `lsof -iTCP:8080 -sTCP:LISTEN` | wrong address or `SERVER_ADDRESS=127.0.0.1` |
+
+## Not covered (on purpose)
+
+No database (a restart forgets everything), no accounts, no rate limit, one process only, old duels are never removed, no automated tests.
+````
+
+</details>
+
+Yours should be in your words, but every claim in it should be one you've seen in this lesson. The last section, "Not covered (on purpose)", is as important as the first: it tells the next person what the system *doesn't* promise.
+
+Now the commit:
+
+```text
+Commit: ops: configuration, logs, health, Dockerfile and runbook
+```
+
+```bash
+git log --oneline dbf7aa9..v2
+```
+
+```text
+8326114 ops: configuration, logs, health, Dockerfile and runbook
+da369c8 live: DeadlineScheduler pushes FINISHED at the deadline
+01d4dd8 live: socket registry, handler, heartbeat and DuelChanged listener
+a841fe1 web: controller, DTOs and ErrorMapper
+37a995f app: DuelService with idempotent answers and key expiry
+97bfeb1 app: DuelRepository port and in-memory adapter
+73a28a2 domain: Duel as a pure state machine with sealed results
+7b8d75c chore: v2 skeleton, Clock bean, scheduler, properties
+58785aa docs: design for v2
+```
+
+Your branch is nine commits (plus the earlier ones from `main`). Each one compiled and ran.
+
+### Your phone, against v2
+
+The Compose Multiplatform app talks to a base URL (Lesson 27: one place). Point it at v2 and nothing else changes, because `API.md` didn't:
+
+| Where the app runs | Base URL for v2 |
+|---|---|
+| Android emulator | `http://10.0.2.2:8081` |
+| a real phone on your Wi-Fi | `http://<your laptop's LAN address>:8081` |
+| desktop / web target | `http://localhost:8081` |
+
+Run v2 (or the container), play a duel between two instances of the app, and watch the server log: `duel created`, two `socket watches`, `socket left` at the end. If a phone cannot connect, the Lesson 27 checklist applies unchanged (address the server listens on, cleartext allowed on Android, firewall).
+
+I haven't run the Compose app against v2; the run is yours. A duel on two devices is the real acceptance test, because it exercises the five phone rules from Lesson 28 that a script can't.
+
+<Quiz
+  question="DUEL_LENGTH is set to a typo. What happens at start-up?"
+  options={[
+    'It quietly falls back to defaults',
+    'The first duel fails at runtime',
+    'Startup fails and names the property',
+  ]}
+  answer={2}
+>
+`@ConfigurationProperties` binds at start-up and fails fast with the property, the value and its origin. Silent fallbacks hide mistakes.
+</Quiz>
+
+<Quiz
+  question="Readiness fails. What should the platform running the container do?"
+  options={[
+    'Restart the container immediately',
+    'Stop sending it traffic',
+    'Delete the container image',
+  ]}
+  answer={1}
+>
+Readiness means "can't take traffic *now*" (starting, overloaded, shutting down). Restarting is what a failing **liveness** probe is for.
+</Quiz>
+
+<Quiz
+  question="Why log with key-values instead of text only?"
+  options={[
+    'Each field can be searched separately',
+    'The message becomes shorter on disk',
+    'Logback rejects any long message otherwise',
+  ]}
+  answer={0}
+>
+A log system can filter `duel = "LSMP"` as a field. If the code is only inside the message, you're back to searching text.
+</Quiz>
+
+## Your turn
+
+<Think id="maths-l34-exercise" prompt="Pick a symptom from the runbook that is NOT in the table yet: 'players say the duel ends too early'. List three things to check, in order, using only what v2 gives you." revealLabel="Check">
+(1) The first log line, `duel settings`: is `length` really what you expect (an environment variable can override it)? (2) The `socket silent` / `push failed` lines for that duel: did a phone get dropped and reconnect to a *finished* duel? (3) `GET /duels/CODE` and compare `secondsLeft` with the clock on the phone: the phone's own clock isn't the server's (Lesson 18), so the player may be counting a different 60 seconds. Add the row to the README.
+</Think>
+
+<Think id="maths-l34-teachback" prompt="In 4–5 sentences: what changed between 'it runs on my laptop' and 'someone else can run it', and which of those changes need no code change at all?" revealLabel="Compare with a model answer">
+Every setting is now a typed property with a default that an environment variable or the command line can override, and a typo stops the app at start-up with the property and its origin. The app answers liveness and readiness questions on `/actuator/health`, logs fields that a log system can filter (as JSON under the `prod` profile), and stops gracefully on SIGTERM. A multi-stage Dockerfile packages it as an image anyone can `docker run`, and the README says how to run it, what each log line means and where to look for each symptom. Changing a duel length, a ping interval or the log format needs no rebuild, just a different environment variable or profile.
+</Think>
+
+## Read alongside
+- 📖 **Primary:** [Spring Boot reference: Production-ready features (Actuator)](https://docs.spring.io/spring-boot/reference/actuator/index.html) and [Liveness and readiness probes](https://docs.spring.io/spring-boot/reference/actuator/endpoints.html#actuator.endpoints.kubernetes-probes) (15 min).
+- [Spring Boot reference: Structured logging](https://docs.spring.io/spring-boot/reference/features/logging.html#features.logging.structured): the `logstash` and `ecs` formats.
+- [Docker docs: multi-stage builds](https://docs.docker.com/build/building/multi-stage/) and [Dockerfile best practices](https://docs.docker.com/build/building/best-practices/).
+- [The Twelve-Factor App: III. Config](https://12factor.net/config): the idea behind environment variables.
+
+🙋 Ask me: "how would this run on a server I rent?", "what would a deployment lesson cover?", "what is Kubernetes liveness vs readiness doing here?", "review my README as if you were on call".
+
+**Next:** Lesson 35: review: v1 against v2, in numbers, and the one change that shows what the design is for.
