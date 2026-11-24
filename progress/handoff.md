@@ -14,7 +14,7 @@ This repo is a self-taught backend course: a public GitHub Pages site plus a tea
   - `learning-records/`
   - `drafts/`
 - Lessons are MDX pages: `site/src/content/docs/maths/NNNN-*.mdx`.
-- Concept map, the source of lesson order: `site/src/content/docs/maths/map.mdx` (42 concepts, 29 lessons; Cross Math dropped 2026-11-23).
+- Concept map, the source of lesson order: `site/src/content/docs/maths/map.mdx` (42 concepts, 35 lessons; Cross Math dropped 2026-11-23).
 - Published:
   - **Lesson 1**: Why the game needs a server (source of truth; client/server)
   - **Lesson 2**: Processes, IP addresses, ports
@@ -67,7 +67,9 @@ This repo is a self-taught backend course: a public GitHub Pages site plus a tea
 - **Learner asked Claude to code the two server fixes and move on (2026-11-24):** maths commits 2017d5d (timer.schedule in join → push FINISHED at 60 s, real run: v3 FINISHED at 61.0 s on pool-3-thread-1), 02060ac (DUEL_GONE 4404 + phone stops; real run), plus 7c35227 `scripts/play.mjs`, dbf7aa9 `API.md`; all pushed (my commits for these lack the Co-Authored-By trailer).
 - **Lesson 27** (phone to laptop, P1) written 2026-11-24: `lsof` shows `*:8095` (Spring default binds every address), curl and a Node WebSocket via the LAN IP 192.168.42.16 work; `--server.address=127.0.0.1` → curl (7); SERVER_ADDRESS env var works, command line beats env var (real); table emulator 10.0.2.2 / Wi-Fi LAN IP / adb reverse; RFC 1918; base URL in one place; Android cleartext (network security config, API 28+). The real phone-browser test is the learner's (not run by Claude).
 - **Lesson 28** (API contract) written 2026-11-24: full real curl transcript, `play.mjs` run (12 versions, both phones see each, Hari 5 Sita 3), five phone rules table (versions, retry same body, Idempotency-Key, reconnect+ping+stop on 4404, cleartext+one base URL), Retrofit mapping. Learner will send a Compose Multiplatform reference; then check it against the five rules.
-- **Next to write:** Lesson 29, own it (rebuild the core from memory, two phones). The learner's CMP reference is pending: ask for it / review it against API.md.
+- **2026-11-24: NEW CAPSTONE replaces "own it".** The learner asked to rebuild the whole backend as **v2**, production-style, designed first. Confirmed: worktree `~/code/personal/maths-v2` on branch `v2` (v1 on 8080, v2 on 8081, same API.md/play.mjs/CMP app); **NO automated tests** (their words: "testing not yet"); 7 lessons assumed. Lessons 29-35: R0 design doc, R1 skeleton + pure domain, R2 application + port + idempotency + events, R3 HTTP adapter + ErrorMapper, R4 live adapter + DeadlineScheduler, R5 production readiness (config, logs, health, Dockerfile, runbook, CMP app against v2), R6 review v1 vs v2. 9 commits (see memory `v2-rebuild`). The learner codes it, shows Claude, Claude checks by running. Don't touch `maths/client` (another thread).
+- **Lesson 29** (design before code) written 2026-11-24: audit of v1 (DuelService 190 lines, 7 concerns, Instant.now() forces 61 s waits, service imports LiveDuels), worktree commands (real, scratch), requirements table, package diagram + dependency rule table (manual grep, not a test), v1-to-v2 where-things-go table, DuelError sealed sketch, Clock.fixed demo (28 ms), two sequence diagrams (answer, deadline), failures table, config properties table, 9-commit plan. Exercise: write `docs/DESIGN.md` in the worktree (commit 1 "docs: design for v2"), not pushed.
+- **Next to write:** Lesson 30 (skeleton + pure domain). The learner's CMP reference review (against the five rules) is still pending.
 
 ## Where the learner's answers are
 Every question in a lesson is a `Think` box. Answers sync to the learner's **secret gist "backend-engineering answers"** (`<think-id>.md`), from the site on any device once they've pasted a gist-scoped token, and from chat (Claude writes them there). Fetch from the gist before grading: `gh gist list | grep 'backend-engineering answers'`.

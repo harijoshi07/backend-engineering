@@ -27,7 +27,7 @@ flowchart TB
     G["7 · Two players at once<br/>race conditions · locks"]
     H["8 · Failure<br/>timeouts · retries · idempotency · ordering"]
     I["9 · Live updates<br/>polling · WebSocket · push · heartbeats"]
-    K["10 · Play & own it<br/>phone → laptop · API contract · rebuild from memory"]
+    K["10 · Play & own it<br/>phone → laptop · API contract · rebuild v2"]
     A --> B --> C --> D --> E --> F --> G --> H --> I --> K
 ```
 
@@ -78,6 +78,12 @@ flowchart TB
 | W4 | **Disconnects**: heartbeats, reconnect, resync | W3, R3 | 26 ✅ |
 | P1 | **Phone → laptop**: LAN IP, which address the server listens on, configuration | N1, N2, S6 | 27 ✅ |
 | P2 | **API contract** → AI-built app → a real duel 🎮 | all of the above | 28 ✅ |
-| ★ | **Own it**: rebuild the core from memory | everything | 29 🔜 |
+| ★1 | **Design first**: boundaries, ports and adapters, failures table, commit plan | everything | 29 ✅ |
+| ★2 | **Pure domain**: immutable state machine, sealed results, injected `Clock` | G2, G4, R3 | 30 🔜 |
+| ★3 | **Application layer**: repository port, idempotency with expiry, domain events | C3, R2 | 31 |
+| ★4 | **HTTP adapter**: DTOs, one error mapper, contract check | S8, P2 | 32 |
+| ★5 | **Live adapter**: sockets, heartbeat, deadline scheduler | W3, W4 | 33 |
+| ★6 | **Production readiness**: config, logs, health, Dockerfile, runbook | P1 | 34 |
+| ★7 | **Review**: v1 vs v2 | everything | 35 |
 
 Not in this project (on purpose): databases, accounts and logins, DNS, deploying to the internet. They come in the 100-session course.
